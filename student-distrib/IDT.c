@@ -1,5 +1,5 @@
 /* idt.c - Functions to display exceptions and initialize interrupt descriptor table
-author - Filip Cakulev
+Author - Filip Cakulev
 https://wiki.osdev.org/Interrupt_Descriptor_Table
 https://wiki.osdev.org/Exceptions
  */
@@ -9,11 +9,11 @@ https://wiki.osdev.org/Exceptions
 //ecxeption handling for giant switch case
 void div_by_0(){exceptions(0);}
 void debug(){exceptions(1);}
-void NMI(){exceptions(2);}
+void NMInt(){exceptions(2);}
 void breakpoint(){exceptions(3);}
 void overflow(){exceptions(4);}
-void BRE(){exceptions(5);}
-void inavlid_opcode(){exceptions(6);}
+void BoundRE(){exceptions(5);}
+void invalid_opcode(){exceptions(6);}
 void device_not_available(){exceptions(7);}
 void double_fault(){exceptions(8);}
 void CP_seg_overrun(){exceptions(9);}
@@ -183,11 +183,126 @@ void exceptions(int exception_num)
   }
 
   exception_flag = 1;
+  while(1){}
 }
 
-
+/*
+ * idt_init
+ *   DESCRIPTION: inializes the interrupt descriptor table.
+ *   INPUTS: none
+ *   OUTPUTS: none
+ *   RETURN VALUE: none
+ *   SIDE EFFECTS: sets dpl, present, and type values accordingly for systemcalls,
+                  exceptions, keyboard, mouse, rtc, and pit (?)
+ */
  void idt_init()
  {
     int i;
-    for(i = 0; i < )
+    for(i = 0; i < EXCEPTIONS_AMOUNT; i++)
+    {
+      idt[i].present = 1; //enable
+
+      idt[i].dpl  = 0;        //set privilege level to handle exceptions
+      //sets type to 01110 (32-bit interrupt gate) see page 22 of mp3 documentation
+      idt[i].reserved = 0;
+      idt[i].size = 1;
+      idt[i].reserved1 = 1;
+      idt[i].reserved2 = 1;
+      idt[i].reserved3 = 0;
+      idt[i].reserved4 = 0;   //unused?
+
+      idt[i].seg_selector = KERNEL_CS   //selector set to kernel
+    }
+
+    //set up exception handling entries
+    SET_IDT_ENTRY(idt[0], div_by_0);
+    SET_IDT_ENTRY(idt[1], debug);
+    SET_IDT_ENTRY(idt[2], NMInt);
+    SET_IDT_ENTRY(idt[3], breakpoint);
+    SET_IDT_ENTRY(idt[4], overflow);
+    SET_IDT_ENTRY(idt[5], BoundRE);
+    SET_IDT_ENTRY(idt[6], invalid_opcode);
+    SET_IDT_ENTRY(idt[7], device_not_available);
+    SET_IDT_ENTRY(idt[8], double_fault);
+    SET_IDT_ENTRY(idt[9], CP_seg_overrun);
+    SET_IDT_ENTRY(idt[10], invalid_tss);
+    SET_IDT_ENTRY(idt[11], seg_not_present);
+    SET_IDT_ENTRY(idt[12], stack_seg_fault);
+    SET_IDT_ENTRY(idt[13], general_protection);
+    SET_IDT_ENTRY(idt[14], page_fault);
+    SET_IDT_ENTRY(idt[15], reserved0);      //not sure if these need to handled
+    SET_IDT_ENTRY(idt[16], floating_point);
+    SET_IDT_ENTRY(idt[17], alignment_check);
+    SET_IDT_ENTRY(idt[18], machine_check);
+    SET_IDT_ENTRY(idt[19], simd_floating_point);
+    SET_IDT_ENTRY(idt[20], virtualization);
+    SET_IDT_ENTRY(idt[21], reserved1);       //not sure if these need to handled
+    SET_IDT_ENTRY(idt[22], reserved2);       //not sure if these need to handled
+    SET_IDT_ENTRY(idt[23], reserved3);       //not sure if these need to handled
+    SET_IDT_ENTRY(idt[24], reserved4);       //not sure if these need to handled
+    SET_IDT_ENTRY(idt[25], reserved5);       //not sure if these need to handled
+    SET_IDT_ENTRY(idt[26], reserved6);       //not sure if these need to handled
+    SET_IDT_ENTRY(idt[27], reserved7);       //not sure if these need to handled
+    SET_IDT_ENTRY(idt[28], reserved8);       //not sure if these need to handled
+    SET_IDT_ENTRY(idt[29], reserved9);       //not sure if these need to handled
+    SET_IDT_ENTRY(idt[30], security);
+    SET_IDT_ENTRY(idt[31], reserved10);       //not sure if these need to handled
+
+    for(i = EXCEPTIONS_AMOUNT; i < MASTER_AND_SLAVE; i++){
+
+        idt[i].present = 1; //enable
+
+        idt[i].dpl  = 0;        //set privilege level to handle exceptions
+        //sets type to 01110 (32-bit interrupt gate) see page 22 of mp3 documentation
+        idt[i].reserved = 0;
+        idt[i].size = 1;
+        idt[i].reserved1 = 1;
+        idt[i].reserved2 = 1;
+        idt[i].reserved3 = 0;
+        idt[i].reserved4 = 0;   //unused?
+
+        idt[i].seg_selector = KERNEL_CS   //selector set to kernel
+    }
+    for(i = MASTER_AND_SLAVE; i < NUM_VEC; i++)
+    {
+        if(i = SYS_CALL_VECT)
+        {
+          idt[i].present = 1; //enable
+          idt[i].dpl  = 3;
+          //sets type to 01111 (32-bit trap gate)
+          idt[i].reserved = 0;
+          idt[i].size = 1;
+          idt[i].reserved1 = 1;
+          idt[i].reserved2 = 1;
+          idt[i].reserved3 = 1;
+          idt[i].reserved4 = 0;   //unused?
+
+          idt[i].seg_selector = KERNEL_CS   //selector set to kernel
+        }
+        else
+        {
+            idt[i].present = 0; //disable
+            idt[i].dpl  = 0;
+            //sets type to 01110 (32-bit interrupt gate) see page 22 of mp3 documentation
+            idt[i].reserved = 0;
+            idt[i].size = 1;
+            idt[i].reserved1 = 1;
+            idt[i].reserved2 = 1;
+            idt[i].reserved3 = 0;
+            idt[i].reserved4 = 0;   //unused?
+
+            idt[i].seg_selector = KERNEL_CS   //selector set to kernel
+            SET_IDT_ENTRY(idt[i], 0);
+
+        }
+
+    }
+    //SET_IDT_ENTRY(idt[SYS_CALL_VECT], somehandler); //not sure if needed right now
+    //SET_IDT_ENTRY(idt[timerchip], pithandler); //not sure if needed right now
+    //SET_IDT_ENTRY(idt[0x2C], mouse_handler);
+    SET_IDT_ENTRY(idt[KEYBOARD_IRQ], keyboard_handler);
+    SET_IDT_ENTRY(idt[IRQ8], RTC_handler);
+
+    lidt(idt_desc_ptr);
+    return;
  }
