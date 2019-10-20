@@ -37,7 +37,7 @@ void i8259_init(void) {
   outb(slave_mask, SLAVE_8259_PORT + 1);
 
   restore_flags(flags);
-  return;
+  sti();
 }
 
 /* Enable (unmask) the specified IRQ */
@@ -60,7 +60,7 @@ void enable_irq(uint32_t irq_num) {
     outb(master_mask, MASTER_8259_PORT + 1);
   }
   printf("enabled\n");
-  return;
+
 }
 
 /* Disable (mask) the specified IRQ */
@@ -85,18 +85,17 @@ void disable_irq(uint32_t irq_num) {
     outb(master_mask, MASTER_8259_PORT + 1);
   }
   restore_flags(flags);
-  return;
+
 }
 
 /* Send end-of-interrupt signal for the specified IRQ */
 void send_eoi(uint32_t irq_num) {
-  unsigned long flags;
+  cli();      //not sure if needed
   asm volatile(
     "pushal\n"
     :
     :);
-  )
-  cli_and_save(flags);      //not sure if needed
+
   if(irq_num < 8)
   {
     outb(EOI | irq_num, MASTER_8259_PORT);
@@ -106,11 +105,10 @@ void send_eoi(uint32_t irq_num) {
     outb(EOI | (irq_num & 0x0111), SLAVE_8259_PORT);   //make sure to send eoi to master irq2 as well
     outb(EOI | 0x02, MASTER_8259_PORT);
   }
-  restore_flags(flags);
   asm volatile(
     "popal\n"
     :
     :);
-  )
-  return;
+  
+  sti();
 }
