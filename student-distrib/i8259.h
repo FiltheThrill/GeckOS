@@ -26,6 +26,8 @@
  * the interrupt number and sent out to the PIC
  * to declare the interrupt finished */
 #define EOI                 0x60
+#define BYTE1               0xFF
+#define ENABLE_IRQ2        0xFD
 
 /* Externally-visible functions */
 
