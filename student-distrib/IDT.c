@@ -3,9 +3,9 @@ Author - Filip Cakulev
 https://wiki.osdev.org/Interrupt_Descriptor_Table
 https://wiki.osdev.org/Exceptions
  */
-#include "idt.h"
+#include "IDT.h"
 #include "x86_desc.h"
-
+#include "lib.h"
 //ecxeption handling for giant switch case
 void div_by_0(){exceptions(0);}
 void debug(){exceptions(1);}
@@ -178,7 +178,7 @@ void exceptions(int exception_num)
       break;
 
     case 31:
-      printf("I don't think you should be here. This is RESERVED 31 \n")
+      printf("I don't think you should be here. This is RESERVED 31 \n");
       break;
   }
 
@@ -204,14 +204,14 @@ void exceptions(int exception_num)
 
       idt[i].dpl  = 0;        //set privilege level to handle exceptions
       //sets type to 01110 (32-bit interrupt gate) see page 22 of mp3 documentation
-      idt[i].reserved = 0;
+      idt[i].reserved0 = 0;
       idt[i].size = 1;
       idt[i].reserved1 = 1;
       idt[i].reserved2 = 1;
       idt[i].reserved3 = 0;
       idt[i].reserved4 = 0;   //unused?
 
-      idt[i].seg_selector = KERNEL_CS   //selector set to kernel
+      idt[i].seg_selector = KERNEL_CS;   //selector set to kernel
     }
 
     //set up exception handling entries
@@ -254,44 +254,44 @@ void exceptions(int exception_num)
 
         idt[i].dpl  = 0;        //set privilege level to handle exceptions
         //sets type to 01110 (32-bit interrupt gate) see page 22 of mp3 documentation
-        idt[i].reserved = 0;
+        idt[i].reserved0 = 0;
         idt[i].size = 1;
         idt[i].reserved1 = 1;
         idt[i].reserved2 = 1;
         idt[i].reserved3 = 0;
         idt[i].reserved4 = 0;   //unused?
 
-        idt[i].seg_selector = KERNEL_CS   //selector set to kernel
+        idt[i].seg_selector = KERNEL_CS;   //selector set to kernel
     }
     for(i = MASTER_AND_SLAVE; i < NUM_VEC; i++)
     {
-        if(i = SYS_CALL_VECT)
+        if(i == SYS_CALL_VECT)
         {
           idt[i].present = 1; //enable
-          idt[i].dpl  = 3;
+          idt[i].dpl  = 3;      // set dpl to 3 for system calls
           //sets type to 01111 (32-bit trap gate)
-          idt[i].reserved = 0;
+          idt[i].reserved0 = 0;
           idt[i].size = 1;
           idt[i].reserved1 = 1;
           idt[i].reserved2 = 1;
           idt[i].reserved3 = 1;
           idt[i].reserved4 = 0;   //unused?
 
-          idt[i].seg_selector = KERNEL_CS   //selector set to kernel
+          idt[i].seg_selector = KERNEL_CS;   //selector set to kernel
         }
         else
         {
             idt[i].present = 0; //disable
             idt[i].dpl  = 0;
             //sets type to 01110 (32-bit interrupt gate) see page 22 of mp3 documentation
-            idt[i].reserved = 0;
+            idt[i].reserved0 = 0;
             idt[i].size = 1;
             idt[i].reserved1 = 1;
             idt[i].reserved2 = 1;
             idt[i].reserved3 = 0;
             idt[i].reserved4 = 0;   //unused?
 
-            idt[i].seg_selector = KERNEL_CS   //selector set to kernel
+            idt[i].seg_selector = KERNEL_CS;   //selector set to kernel
             SET_IDT_ENTRY(idt[i], 0);
 
         }
@@ -300,8 +300,8 @@ void exceptions(int exception_num)
     //SET_IDT_ENTRY(idt[SYS_CALL_VECT], somehandler); //not sure if needed right now
     //SET_IDT_ENTRY(idt[timerchip], pithandler); //not sure if needed right now
     //SET_IDT_ENTRY(idt[0x2C], mouse_handler);
-    SET_IDT_ENTRY(idt[KEYBOARD_IRQ], keyboard_handler);
-    SET_IDT_ENTRY(idt[IRQ8], RTC_handler);
+    //SET_IDT_ENTRY(idt[KEYBOARD_IRQ], keyboard_handler);
+    //SET_IDT_ENTRY(idt[IRQ8], RTC_handler);
 
     lidt(idt_desc_ptr);
     return;
