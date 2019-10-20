@@ -9,6 +9,7 @@
 #include "debug.h"
 #include "tests.h"
 #include "IDT.h"
+#include "keyboard.h"
 
 #define RUN_TESTS
 
@@ -139,6 +140,8 @@ void entry(unsigned long magic, unsigned long addr) {
     idt_init();
     /* Init the PIC */
     i8259_init();
+    /* Init the keyboard */
+    open_keyboard_irq();
 
     /* Initialize devices, memory, filesystem, enable device interrupts on the
      * PIC, any other initialization stuff... */

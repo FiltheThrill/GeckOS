@@ -14,6 +14,7 @@ uint8_t slave_mask;  /* IRQs 8-15 */
 /* Initialize the 8259 PIC */
 void i8259_init(void) {
   unsigned long flags;
+  printf("enabled\n");
 
   cli_and_save(flags);    //not sure if needed
 
@@ -36,6 +37,7 @@ void i8259_init(void) {
   outb(slave_mask, SLAVE_8259_PORT + 1);
 
   restore_flags(flags);
+  return;
 }
 
 /* Enable (unmask) the specified IRQ */
@@ -57,6 +59,8 @@ void enable_irq(uint32_t irq_num) {
     master_mask = master_mask & int_mask;       //update master mask
     outb(master_mask, MASTER_8259_PORT + 1);
   }
+  printf("enabled\n");
+  return;
 }
 
 /* Disable (mask) the specified IRQ */
@@ -81,12 +85,17 @@ void disable_irq(uint32_t irq_num) {
     outb(master_mask, MASTER_8259_PORT + 1);
   }
   restore_flags(flags);
+  return;
 }
 
 /* Send end-of-interrupt signal for the specified IRQ */
 void send_eoi(uint32_t irq_num) {
   unsigned long flags;
-
+  asm volatile(
+    "pushal\n"
+    :
+    :);
+  )
   cli_and_save(flags);      //not sure if needed
   if(irq_num < 8)
   {
@@ -98,4 +107,10 @@ void send_eoi(uint32_t irq_num) {
     outb(EOI | 0x02, MASTER_8259_PORT);
   }
   restore_flags(flags);
+  asm volatile(
+    "popal\n"
+    :
+    :);
+  )
+  return;
 }

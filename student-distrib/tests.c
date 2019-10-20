@@ -4,6 +4,8 @@
 
 #define PASS 1
 #define FAIL 0
+//enablers for tests
+#define DIVTEST 0
 
 /* format these macros as you see fit */
 #define TEST_HEADER 	\
@@ -41,19 +43,16 @@ int idt_test(){
 			result = FAIL;
 		}
 	}
-
 	return result;
 }
 
 int div_by_0_test()
 {
 	TEST_HEADER;
-	
 	int i;
 	int result = PASS;
 	i = 1/0;
 	return result;
-
 }
 // add more tests here
 
@@ -66,6 +65,8 @@ int div_by_0_test()
 /* Test suite entry point */
 void launch_tests(){
 	TEST_OUTPUT("idt_test", idt_test());
-	TEST_OUTPUT("Divide by 0 test", div_by_0_test());
+	#if (DIVTEST == 1)
+		TEST_OUTPUT("Divide by 0 test", div_by_0_test());
+	#endif
 	// launch your tests here
 }

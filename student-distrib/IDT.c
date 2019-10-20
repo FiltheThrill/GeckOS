@@ -6,6 +6,7 @@ https://wiki.osdev.org/Exceptions
 #include "IDT.h"
 #include "x86_desc.h"
 #include "lib.h"
+#include "keyboard.h"
 //ecxeption handling for giant switch case
 void div_by_0(){exceptions(0);}
 void debug(){exceptions(1);}
@@ -51,6 +52,7 @@ void reserved10(){exceptions(31);}
 
 void exceptions(int exception_num)
 {
+  clear();
   switch(exception_num)
   {
     case 0:
@@ -300,7 +302,7 @@ void exceptions(int exception_num)
     //SET_IDT_ENTRY(idt[SYS_CALL_VECT], somehandler); //not sure if needed right now
     //SET_IDT_ENTRY(idt[timerchip], pithandler); //not sure if needed right now
     //SET_IDT_ENTRY(idt[0x2C], mouse_handler);
-    //SET_IDT_ENTRY(idt[KEYBOARD_IRQ], keyboard_handler);
+    SET_IDT_ENTRY(idt[KEYBOARD_IRQ], keyboard_handler);
     //SET_IDT_ENTRY(idt[IRQ8], RTC_handler);
 
     lidt(idt_desc_ptr);
