@@ -144,9 +144,9 @@ void entry(unsigned long magic, unsigned long addr) {
     i8259_init();
     /* Init the keyboard */
     open_keyboard_irq();
-	
+	/* Init the RTC */
 	rtc_init();
-	
+	/* Init paging */
 	paging_init();
 
     /* Initialize devices, memory, filesystem, enable device interrupts on the
