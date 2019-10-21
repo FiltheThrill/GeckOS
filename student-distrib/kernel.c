@@ -11,6 +11,7 @@
 #include "IDT.h"
 #include "keyboard.h"
 #include "rtc.h"
+#include "paging.h"
 
 #define RUN_TESTS
 
@@ -145,6 +146,8 @@ void entry(unsigned long magic, unsigned long addr) {
     open_keyboard_irq();
 	
 	rtc_init();
+	
+	paging_init();
 
     /* Initialize devices, memory, filesystem, enable device interrupts on the
      * PIC, any other initialization stuff... */

@@ -22,7 +22,21 @@
 /* Number of vectors in the interrupt descriptor table (IDT) */
 #define NUM_VEC     256
 
+#define NUM_ENTRIES			1024
+#define FOUR_KB				4096
+#define NOT_PRESENT			0x00000002
+#define PRESENT				0x00000003
+#define PAGING_EN 			0x80000001
+#define PSE_EN				0x00000010
+#define KERNEL_ADDR			0x400000
+#define VIDMEM_ADDR 		0xB8000
+#define KERNEL_PAGE_INIT 	0x00000193
+#define VIDMEM_PAGE_INIT 	0x00000003
+
 #ifndef ASM
+
+uint32_t page_directory[NUM_ENTRIES] __attribute__((aligned(FOUR_KB)));
+uint32_t page_table[NUM_ENTRIES] __attribute__((aligned(FOUR_KB)));
 
 /* This structure is used to load descriptor base registers
  * like the GDTR and IDTR */

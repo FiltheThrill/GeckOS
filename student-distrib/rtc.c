@@ -1,3 +1,7 @@
+/* rtc.c - Functions to display character to screen
+Author - Frankie Papa
+https://wiki.osdev.org/RTC
+ */
 #include "rtc.h"
 #include "lib.h"
 #include "i8259.h"
