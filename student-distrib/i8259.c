@@ -59,7 +59,6 @@ void enable_irq(uint32_t irq_num) {
     master_mask = master_mask & int_mask;       //update master mask
     outb(master_mask, MASTER_8259_PORT + 1);
   }
-  printf("enabled\n");
 
 }
 

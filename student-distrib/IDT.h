@@ -6,7 +6,7 @@
 #define EXCEPTIONS_AMOUNT   32        //first 32 in idt
 #define MASTER_AND_SLAVE    48        //each PIC takes up 1 byte in idt
 #define SYS_CALL_VECT       0x80      // interrupt vector for system calls
-#define IRQ8                40        //real time clock
+#define IRQ8                0x28      //real time clock
 #define KEYBOARD_IRQ        0x21      //keyboard interrupt vector
 
 int exception_flag;

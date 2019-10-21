@@ -10,6 +10,7 @@
 #include "tests.h"
 #include "IDT.h"
 #include "keyboard.h"
+#include "rtc.h"
 
 #define RUN_TESTS
 
@@ -142,6 +143,8 @@ void entry(unsigned long magic, unsigned long addr) {
     i8259_init();
     /* Init the keyboard */
     open_keyboard_irq();
+	
+	rtc_init();
 
     /* Initialize devices, memory, filesystem, enable device interrupts on the
      * PIC, any other initialization stuff... */
