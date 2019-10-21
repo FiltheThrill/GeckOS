@@ -11,6 +11,16 @@
 uint8_t master_mask; /* IRQs 0-7  */
 uint8_t slave_mask;  /* IRQs 8-15 */
 
+/*
+ * i8259_init
+ *   DESCRIPTION: initializes both master and slave PIC. Informs both on their
+                  vector interrupt offset. Tells master where the slave is and
+                  the slave its cascading irqnum.
+ *   INPUTS: none
+ *   OUTPUTS: none
+ *   RETURN VALUE: none
+ *   SIDE EFFECTS: sets irq mask on both to mask all irqs
+ */
 /* Initialize the 8259 PIC */
 void i8259_init(void) {
   unsigned long flags;
@@ -40,6 +50,14 @@ void i8259_init(void) {
   sti();
 }
 
+/*
+ * enable_irq
+ *   DESCRIPTION: enables a given irq by changing the irq mask accordingly
+ *   INPUTS: irq_num - irq port to be enabled
+ *   OUTPUTS: none
+ *   RETURN VALUE: none
+ *   SIDE EFFECTS: changes irq mask
+ */
 /* Enable (unmask) the specified IRQ */
 void enable_irq(uint32_t irq_num) {
   uint8_t int_mask;
@@ -62,7 +80,14 @@ void enable_irq(uint32_t irq_num) {
   printf("enabled\n");
 
 }
-
+/*
+ * disable_irq
+ *   DESCRIPTION: disables a given irq by changing the irq mask accordingly
+ *   INPUTS: irq_num - irq port to be disabled
+ *   OUTPUTS: none
+ *   RETURN VALUE: none
+ *   SIDE EFFECTS: changes irq mask
+ */
 /* Disable (mask) the specified IRQ */
 void disable_irq(uint32_t irq_num) {
   uint8_t int_mask;
@@ -87,7 +112,15 @@ void disable_irq(uint32_t irq_num) {
   restore_flags(flags);
 
 }
-
+/*
+ * send_eoi
+ *   DESCRIPTION: sends an eoi signal to a given irq port to tell the PIC
+                  that the interrupt has been handled
+ *   INPUTS: irq_num - irq port to send eoi to
+ *   OUTPUTS: none
+ *   RETURN VALUE: none
+ *   SIDE EFFECTS: none
+ */
 /* Send end-of-interrupt signal for the specified IRQ */
 void send_eoi(uint32_t irq_num) {
   cli();      //not sure if needed
@@ -109,6 +142,6 @@ void send_eoi(uint32_t irq_num) {
     "popal\n"
     :
     :);
-  
+
   sti();
 }
