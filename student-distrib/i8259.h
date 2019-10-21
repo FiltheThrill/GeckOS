@@ -27,7 +27,7 @@
  * to declare the interrupt finished */
 #define EOI                 0x60
 #define BYTE1               0xFF
-#define ENABLE_IRQ2        0xFD
+#define ENABLE_IRQ2        0xFB
 
 /* Externally-visible functions */
 
