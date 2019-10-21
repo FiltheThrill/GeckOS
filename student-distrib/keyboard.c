@@ -1,7 +1,7 @@
 #include "keyboard.h"
 #include "i8259.h"
 #include "lib.h"
-scancod_lowercase[]
+
 //open keyboard Interrupt on port 1
 void open_keyboard_irq(){
   enable_irq(1);
