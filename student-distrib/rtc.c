@@ -4,8 +4,7 @@
 
 void rtc_init()
 {
-	enable_irq(8);
-	printf("132\n");
+	
 	
 	cli();
 	outb(0x8B, 0x70);
@@ -13,6 +12,12 @@ void rtc_init()
 	outb(0x8B, 0x70);
 	outb(prev | 0x40, 0x71);
 	sti();
+	
+	outb(0x0C, 0x70);
+	inb(0x71);
+	
+	enable_irq(8);
+	
 }
 
 void RTC_handler()
@@ -22,12 +27,14 @@ void RTC_handler()
 	"pushal\n"
 	:
 	:);
-	
 	test_interrupts();
 	printf("123 \n");
 	
+	outb (0x0C, 0x70);
+	inb(0x71);
+	
 	sti();
-	send_eoi(1);
+	send_eoi(8);
 	asm volatile(
 	"popal\n"
 	:
