@@ -6,6 +6,7 @@
 #define FAIL 0
 //enablers for tests
 #define DIVTEST 0
+#define PAGETEST 0
 
 /* format these macros as you see fit */
 #define TEST_HEADER 	\
@@ -50,11 +51,20 @@ int div_by_0_test()
 {
 	TEST_HEADER;
 	int i;
-	int result = PASS;
-	i = 1/0;
+	int result = FAIL;
+	int zero = 0;
+	i = 1/zero;
 	return result;
 }
 // add more tests here
+int page_fault_test()
+{
+	TEST_HEADER;
+	int result = FAIL;
+	uint32_t page = page_directory[0x800000];
+	page = page + 1;
+	return result;
+}
 
 /* Checkpoint 2 tests */
 /* Checkpoint 3 tests */
@@ -69,4 +79,7 @@ void launch_tests(){
 		TEST_OUTPUT("Divide by 0 test", div_by_0_test());
 	#endif
 	// launch your tests here
+	#if (PAGETEST == 1)
+		TEST_OUTPUT("Page Fault test", page_fault_test());
+	#endif
 }

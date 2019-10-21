@@ -37,7 +37,7 @@ void open_keyboard_irq(){
 *   SIDE EFFECTS: echo's keypress to screen
 */
 void keyboard_handler(){
-  char c;
+  unsigned char c;
   cli();                  //disable interrupts for now
   asm volatile(
     "pushal\n"

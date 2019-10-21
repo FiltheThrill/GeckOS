@@ -42,7 +42,7 @@ https://wiki.osdev.org/Setting_Up_Paging
 	 page_table[(VIDMEM_ADDR/FOUR_KB)] |= VIDMEM_PAGE_INIT;
 	 
 	 //Set the vid mem page table to the first 4MB of the page directory and mark it present
-	 page_directory[0] = page_table;
+	 page_directory[0] = (uint32_t)page_table;
 	 page_directory[0] |= PRESENT;
 	 
 	 /* Enable paging */
