@@ -1,6 +1,9 @@
 /* keyboard.c - Functions to handle terminal io and typing
 Author - Ian Goodwin
+//resources used
 https://wiki.osdev.org/PS2_Keyboard
+https://wiki.osdev.org/Text_Mode_Cursor
+
 */
 
 #include "keyboard.h"
@@ -11,54 +14,49 @@ https://wiki.osdev.org/PS2_Keyboard
 //globals
 //static vars
 //lowercase translational table with numbers
-static char scancode_lowercase[] = {0, 0, '1', '2', '3', '4', '5', '6', '7', '8', '9', '0',
+static char scancode_lower[] = {0, 0, '1', '2', '3', '4', '5', '6', '7', '8', '9', '0',
                             '-', '=', 0, 0, 'q', 'w', 'e', 'r', 't', 'y', 'u',
-                            'i', 'o', 'p', '{', '}', '\n', 0, 'a', 's', 'd', 'f','g',
+                            'i', 'o', 'p', '[', ']', '\n', 0, 'a', 's', 'd', 'f','g',
                             'h', 'j', 'k', 'l', ';', 0x27, 0x60, 0, 0x5c, 'z', 'x', 'c',
                             'v', 'b', 'n', 'm', ',', '.', '/', 0, '*', 0, ' ', 0, 0,
                              0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, '7', '8', '9', '-', '4',
                             '5', '6', '+', '1', '2', '3', '0', '.'};
 //uppercase translational table with special chars
-static char scancode_shift[] = {0, 0, '1', '2', '3', '4', '5', '6', '7', '8', '9', '0',
-                            '-', '=', 0, 0, 'q', 'w', 'e', 'r', 't', 'y', 'u',
-                            'i', 'o', 'p', '{', '}', '\n', 0, 'a', 's', 'd', 'f','g',
-                            'h', 'j', 'k', 'l', ';', 0x27, 0x60, 0, 0x5c, 'z', 'x', 'c',
-                            'v', 'b', 'n', 'm', ',', '.', '/', 0, '*', 0, ' ', 0, 0,
+static char scancode_upper[] = {0, 0, '!', '@', '#', '$', '%', '^', '&', '*', '(', ')',
+                            '_', '+', 0, 0, 'Q', 'W', 'E', 'R', 'T', 'Y', 'U',
+                            'I', 'O', 'P', '{', '}', '\n', 0, 'A', 'S', 'D', 'F','G',
+                            'H', 'J', 'K', 'L', ':', 0x27, 0x60, 0, 0x5c, 'Z', 'X', 'C',
+                            'V', 'B', 'N', 'M', '<', '>', '?', 0, '*', 0, ' ', 0, 0,
                              0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, '7', '8', '9', '-', '4',
                             '5', '6', '+', '1', '2', '3', '0', '.'};
-//uppercase translational table with numbers
+//translational table for caps case
 static char scancode_caps[] = {0, 0, '1', '2', '3', '4', '5', '6', '7', '8', '9', '0',
-                            '-', '=', 0, 0, 'q', 'w', 'e', 'r', 't', 'y', 'u',
-                            'i', 'o', 'p', '{', '}', '\n', 0, 'a', 's', 'd', 'f','g',
-                            'h', 'j', 'k', 'l', ';', 0x27, 0x60, 0, 0x5c, 'z', 'x', 'c',
-                            'v', 'b', 'n', 'm', ',', '.', '/', 0, '*', 0, ' ', 0, 0,
+                            '-', '=', 0, 0, 'Q', 'W', 'E', 'R', 'T', 'Y', 'U',
+                            'I', 'O', 'P', '[', ']', '\n', 0, 'A', 'S', 'D', 'F','G',
+                            'H', 'J', 'K', 'L', ';', 0x27, 0x60, 0, 0x5c, 'Z', 'X', 'C',
+                            'V', 'B', 'N', 'M', ',', '.', '/', 0, '*', 0, ' ', 0, 0,
                              0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, '7', '8', '9', '-', '4',
                             '5', '6', '+', '1', '2', '3', '0', '.'};
-//lowercase translational table with special chars
-static char scancode_shiftcaps[] = {0, 0, '1', '2', '3', '4', '5', '6', '7', '8', '9', '0',
-                            '-', '=', 0, 0, 'q', 'w', 'e', 'r', 't', 'y', 'u',
-                            'i', 'o', 'p', '{', '}', '\n', 0, 'a', 's', 'd', 'f','g',
-                            'h', 'j', 'k', 'l', ';', 0x27, 0x60, 0, 0x5c, 'z', 'x', 'c',
-                            'v', 'b', 'n', 'm', ',', '.', '/', 0, '*', 0, ' ', 0, 0,
-                             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, '7', '8', '9', '-', '4',
-                            '5', '6', '+', '1', '2', '3', '0', '.'};
+//prompt to display in term
+static char prompt[CURSOROFF] = {'[','t','e','r','m',']',':',' '};
 //dynamic vars (made volatile to survive running)
 //all keyboard uses for each possible terminal are stored here
 volatile unsigned int term;                   //global for current terminal 0,(1,2,3,4 for multiterm)
+//[x,x,x,ins,alt,caps,ctrl,shift]
+volatile unsigned char ops;                   //char to store modifiers
+volatile int media;                           //op for media key presses
 volatile unsigned int cmd_len[TNUM];          //global for each command length
 volatile char cmd_buf[TNUM][BUFMAX];          //global cmd store for any terminal
 volatile unsigned int cursorX[TNUM];          //cursor x val
 volatile unsigned int cursorY[TNUM];          //cursor y val(line num)
-volatile unsigned int cmdX[TNUM];             //Xpos of command
-volatile unsigned int cmdY[TNUM];             //Ypos of command
+volatile unsigned int bufX[TNUM];             //virtual cursor tracker for the buffer
 volatile uint8_t attr[TNUM];                  //attributes for console
-volatile uint8_t address[TNUM];              //vid mem pointers
-//[x,x,x,x,alt,caps,ctrl,shift]
-volatile unsigned char ops;                   //char to store modifiers
+volatile uint32_t address[TNUM];               //vid mem pointers
 //boolean using n or y
 volatile unsigned char termRead[TNUM];        //allow typed term read
 //extra credit!!
-volatile char cmd_hist[TNUM][HNUM][BUFMAX];   //allows for cmd history up to a cnt
+volatile unsigned int histnum[TNUM];          //cnt for place in hist
+volatile char cmd_hist[TNUM][HISTNUM][BUFMAX];   //allows for cmd history up to a cnt
 /*
 * keyboard_init
 *   DESCRIPTION: enables irq1 to allow keyboard interrupts
@@ -72,15 +70,13 @@ void keyboard_init(){
   //no protect needed, interrupt not enabled
   //set global trackers and commands
   //have to init_terminal first in order to run this
-  int i;
-  int j;
+  int i,j,k;
   for(i=0;i<TNUM;i++){
     termRead[i] = 'n';
     cmd_len[i] = 0;
-    cursorX[i] = 0;
+    cursorX[i] = CURSOROFF;
     cursorY[i] = 0;
-    cmdX[i] = 0;
-    cmdY[i] = 0;
+    histnum[i] = 0;
     //change for color?
     attr[i] = 0x07;
     address[i] = term_addr(i);
@@ -92,9 +88,18 @@ void keyboard_init(){
       cmd_buf[i][j] = 0;
     }
   }
+  //set global hist
+  for(i=0;i<TNUM;i++){
+    for(j=0;j<HISTNUM;j++){
+      for(k=0;k<BUFMAX;k++){
+        cmd_hist[i][j][k] = 0;
+      }
+    }
+  }
   //set term num to first term (0)
   term = 0;
   ops = 0;
+  media = 0;
   //enable req and clear the screen
   enable_irq(1);
   clear();
@@ -126,9 +131,6 @@ int32_t term_read(int32_t fd, char * buf, int32_t nbytes){
   unsigned int idx = fetch_process();
   int32_t i;
   char c;
-  //set cmdloc to cursor
-  cmdX[idx] = cursorX[idx];
-  cmdY[idx] = cursorY[idx];
   //wait for command completion (spam?)
   while(1){
     if(termRead[idx] == 'y'){
@@ -139,17 +141,21 @@ int32_t term_read(int32_t fd, char * buf, int32_t nbytes){
   if(USEHIST == 1){
     history_write();
   }
-  //clean up and read
+  //clean up and read buffer
+  term_clear(term,0);
   c = cmd_buf[idx][0];
   i = 0;
-  term_clear(term,0);
-  while(i<nbytes && c != 0){
+  //pull if inside buffer and set values
+  while(i<nbytes && c != 0 && i<BUFMAX){
     c = cmd_buf[idx][i];
     buf[i] = c;
-    cmd_buf[idx][i] = 0;
     i++;
   }
-  //reset vals
+  //clean up buffer
+  for(i=0;i<BUFMAX;i++){
+    cmd_buf[idx][i] = 0;
+  }
+  //reset vals, ret bytes read
   cmd_len[idx] = 0;
   termRead[idx] = 'n';
   return i;
@@ -177,18 +183,21 @@ void keyboard_handler(){
   //loop allows for fast typing to fill keyboard buffer
   while(ANDFULL & stat){
     scan = inb(DATAPORT);          //get data from key press
-    parse_input(scan);             //parse the input
-    //update cursor pos
-    cursorX[term] = cmdX[term];
-    cursorY[term] = cmdY[term];
-    i=0;
-    while(i<cmd_len[term]){        //print whole keyboard buffer
-      term_putc(term,cmd_buf[term][i]);
-      i++;
+    i = parse_input(scan);         //parse the input
+    if(i == 2){
+      break;                       //stop char encountered
     }
     stat = inb(STATREG);           //eval buffer
   }
-
+  //rectify buf tracker with cursor
+  cursorX[term] = cursorX[term] + bufX[term];
+  bufX[term] = 0;
+  i=0;
+  while(i<cmd_len[term]){          //print whole keyboard buffer
+    term_putc(term,cmd_buf[term][i]);
+    i++;
+  }
+  move_cursor(term);               //redraw the cursor
   sti();                           // reenable interrupts
   send_eoi(1);                     //send end of interrupt signal to irq2
   asm volatile(
@@ -199,39 +208,77 @@ void keyboard_handler(){
   asm("iret");                     // interrupt return
 }
 
-//moves the cursor forward by arg
-void move_cursor(unsigned int cursor){
-  uint32_t loc = cmdY[term] * XMAX; //iterate the pos down rows
-  loc = loc + cmdX[term] + cursor;      //add in x vals plus added chars
-  unsigned char write = loc&0xFF;       //mask all bits outside of char val
-  //write new low cursor
-  outb(CURSORLOW,CURSORLOC);
-  outb(write,CURSORLOC);
-  //shift bits and write new high cursor
-  write = loc;
-  write = write>>BYTE;
-  write = write&0xFF;
-  outb(CURSORHIGH,CURSORLOC);
-  outb(write,CURSORLOC);
+//moves the cursor forward based on coords
+void move_cursor(unsigned int t){
+  validate_cursor(t);
+  uint16_t loc = cursorY[t] * XMAX;     //iterate the pos down rows
+  loc = loc + cursorX[t];               //add in x vals
+  uint8_t writeL = loc&0x00FF;          //mask all bits outside of char val
+  uint8_t writeH = loc&0xFF00;
+  writeH = writeH>>BYTE;
+  //write low bits
+  outb(CURSORLA,CURSORLB);
+  outb(CURSORHA,writeL);
+  //write high bits
+  outb(CURSORLA,CURSORHB);
+  outb(CURSORHA,writeH);
+  return;
 }
-
+//validates the cursor location vars
+void validate_cursor(uint8_t t){
+  //fix 2d coordinate scheme
+  while(cursorX[t] > XMAX){
+    cursorY[t]++;
+    cursorX[t] = cursorX[t] - XMAX;
+  }
+  if(cursorX[t] < CURSOROFF){
+    cursorX[t] = CURSOROFF;
+  }
+  //end of screen
+  if(cursorY[t] * XMAX + cursorX[t] > XMAX*YMAX){
+    cursorY[t] = YMAX;
+    cursorX[t] = XMAX;
+    return;
+  }
+}
+//ret 0 for inaction, 1 for next, 2 for stop
 int parse_input(uint8_t scancode){
   int ret;
   char c;
+
+  //check for indicator of media keys
+  //next value will be the actual key
+  if(scancode == 0xE0){
+    media = 1;
+    return 1;
+  }
   //update the ops
   ret = update_ops(scancode);
   if(ret == 1){
     //was a flag, ret
     return ret;
   }
+  //handle media key input
+  if(media == 1){
+    ret = process_media(scancode);
+    media = 0;
+    return ret;
+  }
+  //must be in the char array
   c = generate_char(scancode);
+  ret = 1;
+  if(c == 0){
+    //didnot generate useful char
+    return ret;
+  }
   ret = process_char(c);
-  if(ret == 1){
+  if(ret == 1 || ret == 2){
     //was a special char, handled
     return ret;
   }
-  //needs to be written, insert
+  //needs to be written, insert to build buf
   insert_char(c,cursorX[term]);
+  ret = 1;
   return ret;
 }
 int process_char(char c){
@@ -240,16 +287,20 @@ int process_char(char c){
   {
     case 13:  //enter
       termRead[term] = 'y';
-      return 1;
+      return 2;
     case 127: //delete
-      cursorX[term]--;
-      cmd_buf[term][cmd_len[term]-1]=0;
+      if(bufX > 0){
+        bufX[term]--;
+      }
       cmd_len[term]--;
+      cmd_buf[term][cmd_len[term]]=0;
       return 1;
     case 8: //backspace
-      cursorX[term]--;
-      cmd_buf[term][cmd_len[term]-1]=0;
+      if(bufX > 0){
+        bufX[term]--;
+      }
       cmd_len[term]--;
+      cmd_buf[term][cmd_len[term]]=0;
       return 1;
     default:
       break;
@@ -263,32 +314,68 @@ int process_char(char c){
   //is a printable char
   return 0;
 }
+//inserts char to build buffer
 void insert_char(char c, int idx){
   char temp;
-  int len;
-
-  len = cmd_len[term];
-  cmd_len[term]++;
-  cursorX[term]++;
-  //push back the rest of the cmd buf
-  idx++;
-  while(idx < len){
-    temp = cmd_buf[term][len];
-    len--;
-    cmd_buf[term][len] = temp;
+  int i;
+  //do nothing if buf overflow
+  if(idx >= BUFMAX-2 || cmd_len[term] > BUFMAX-1){
+    return;
   }
-  idx--;
+  //insert if toggled on
+  if(ops && 0x10 == 1){
+    cmd_buf[term][idx] = c;
+    bufX[term]++;
+    return;
+  }
+  //apped char at end
+  if(idx == cmd_len[term]){
+    cmd_len[term]++;
+    bufX[term]++;
+    cmd_buf[term][idx] = c;
+    return;
+  }
+  //insert is inside buf, shift the content after up by 1
+  i = cmd_len[term];
+  while(idx < i){
+    temp = cmd_buf[term][i-1];
+    cmd_buf[term][i] = temp;
+    i--;
+  }
   cmd_buf[term][idx] = c;
+  cmd_len[term]++;
+  bufX[term]++;
+  return;
 }
-
-//func to update the ops based on scancode
-//[x,x,x,x,alt,caps,ctrl,shift]
-int update_ops(uint8_t scancode){
-  //check for indicator of media keys
-  //next value will be the actual key
-  if(scancode == 0xE0){
-    scancode = inb(DATAPORT);
+//handles media key presses
+int process_media(uint8_t scancode){
+  int ret;
+  ret = 0;
+  switch(scancode)
+  {
+    case 0x48:  //up arrow
+      if(USEHIST == 1){
+        history_fetch(term);
+        return 2;
+      }
+      return ret;
+    case 0x04B: //left arrow
+      if(bufX[term] > 0){
+        bufX[term]--;
+      }
+      return 1;
+    case 0x04D: //right arrow
+      if(bufX[term] < BUFMAX && cmd_buf[term][cmd_len[term]] != 0){
+        bufX[term]++;
+      }
+      return 1;
+    default:
+      return 0;
   }
+}
+//func to update the ops based on scancode
+//[x,x,x,ins,alt,caps,ctrl,shift]
+int update_ops(uint8_t scancode){
   switch(scancode)
   {
   //pressed cases
@@ -307,22 +394,27 @@ int update_ops(uint8_t scancode){
     case 0x38: //alt
       ops = ops | 0x08;
       return 1;
+    case 0x52: //ins
+      ops = ops | 0x10;
+      return 1;
   //released cased
     case 0xB6: //right shift
-      ops = ops & 0x0E;
+      ops = ops & 0xFE;
       return 1;
     case 0xAA: //left shift
-      ops = ops & 0x0E;
+      ops = ops & 0xFE;
       return 1;
     case 0x9D: //ctrl
-      ops = ops & 0x0D;
+      ops = ops & 0xFD;
       return 1;
     case 0xBA: //caps
-      ops = ops & 0x0B;
+      ops = ops & 0xFB;
       return 1;
     case 0xB9: //alt
-      ops = ops | 0x07;
+      ops = ops & 0xF7;
       return 1;
+    case 0xD2: //insert
+      ops = ops & 0xEF;
     default:   //no ops
       return 0;
   }
@@ -331,15 +423,14 @@ int update_ops(uint8_t scancode){
 //returns 0 if no char is needed based on flags
 char generate_char(uint8_t scancode){
   char c;
-
-  c = 0; //filler val
+  c = 0; //will ret if no char made
   switch(ops)
   {
     case 0:        //no flags
-      c = scancode_lowercase[scancode];
+      c = scancode_lower[scancode];
       return c;
     case 1:        //shift only
-      c = scancode_shift[scancode];
+      c = scancode_upper[scancode];
       return c;
     case 2:       //ctrl only
       return c;
@@ -348,8 +439,8 @@ char generate_char(uint8_t scancode){
     case 4:       //just caps
       c = scancode_caps[scancode];
       return c;
-    case 5:       //caps and shift
-      c = scancode_shiftcaps[scancode];
+    case 5:       //caps and shift (fix later)
+      c = scancode_upper[scancode];
       return c;
     case 6:       //caps and ctrl
       return c;
@@ -400,7 +491,7 @@ void history_write(){
     //do nothing
     return;
   }
-  for(i=0;i<HNUM-1;i++){
+  for(i=0;i<HISTNUM-1;i++){
     //dont waste effort on usless transfer
     if(cmd_hist[term][i][0] != 0){
       j=0;
@@ -427,16 +518,17 @@ unsigned int fetch_process(){
   //return the term for now
   return id;
 }
+//puts char at loc based on given cursor loc
 extern void term_putc(unsigned int t, uint8_t c){
   //do same as putc
   if(USEPAGE == 0){
-    //write like normal
-    putc(c);
-    return;
+    //use standard vmem address
+    address[t] = 0xB8000;
   }
-  if(c == '\n' || c == '\r') {
+  if(c == '\n') {
       cursorY[t]++;
       cursorX[t] = 0;
+      return;
   }
   else {
       *(uint8_t *)(address[t] + ((XMAX * cursorY[t] + cursorX[t]) << 1)) = c;
@@ -454,12 +546,17 @@ void term_clear(unsigned int t, int op){
   if(USEPAGE == 0){
     clear();
   }
-  //modify given clear
+  //modify given clear, blank vid mem
   else{
     for (i = 0; i < YMAX * XMAX; i++) {
         *(uint8_t *)(address[t] + (i << 1)) = ' ';
         *(uint8_t *)(address[t] + (i << 1) + 1) = attr[t];
     }
+  }
+  //print prompt
+  for(i=0;i<CURSOROFF;i++){
+    term_putc(t,prompt[i]);
+    cursorX[t]++;
   }
   //caller chose to add buffer to screen
   if(op == 1){

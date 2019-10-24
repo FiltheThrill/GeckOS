@@ -9,32 +9,38 @@
 #define BUFMAX      0x80        //max size of terminal string (128 for now)
 #define XMAX        0x50        //max amount of chars on a line
 #define YMAX        0x19        //max amount of allowed rows
-#define CURSORLOW   0x0F        //write to low cursor byte
-#define CURSORHIGH  0x0E        //write to high cursor byte
-#define CURSORLOC   0x3D4       //mem loc for cursor
+#define CURSOROFF   0x08        //offset for cursor to allow prompt
+#define CURSORLB    0x0F        //write to low cursor byte
+#define CURSORHB    0x0E        //write to high cursor byte
+#define CURSORLA    0x3D4       //low mem loc for cursor
+#define CURSORHA    0x3D5       //high mem loc for cursor
 #define BYTE        0x08        //byte size
-#define HNUM        0x05        //cnt for how many commands can be saved
+#define HISTNUM     0x05        //cnt for how many commands can be saved
 //controls
 #define USEPAGE     0x00        //binary on off for paging with the shell
 #define USEHIST     0x01        //binary on/off for history feature
 #define USECMD      0x01        //binary on/off for extra keyboard commands
 
+//externals
 extern void keyboard_init();
 extern void update_term(unsigned int term);
 extern void keyboard_handler();
-extern int parse_input(uint8_t scancode);
-extern void move_cursor(unsigned int cursor);
+extern void move_cursor();
 extern unsigned int fetch_process();
-extern int update_ops(uint8_t scancode);
-extern char generate_char(uint8_t scancode);
-extern void insert_char(char c, int idx);
 extern int32_t term_write(int32_t fd, const char * buf, int32_t nbytes);
 extern int32_t term_read(int32_t fd, char * buf, int32_t nbytes);
 extern void term_clear(unsigned int t, int op);
 extern void term_putc(unsigned int t, uint8_t c);
-extern int process_char(char c);
+//internals
+int process_char(char c);
+int process_media(uint8_t scancode);
+int parse_input(uint8_t scancode);
+int update_ops(uint8_t scancode);
+char generate_char(uint8_t scancode);
+void insert_char(char c, int idx);
+void validate_cursor(uint8_t t);
 //extras
-extern void history_fetch(int idx);
-extern void history_write();
+void history_fetch(int idx);
+void history_write();
 
 #endif
