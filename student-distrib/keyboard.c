@@ -49,7 +49,6 @@ volatile unsigned int cmd_len[TNUM];          //global for each command length
 volatile char cmd_buf[TNUM][BUFMAX];          //global cmd store for any terminal
 volatile unsigned int cursorX[TNUM];          //cursor x val
 volatile unsigned int cursorY[TNUM];          //cursor y val(line num)
-volatile unsigned int bufX[TNUM];             //virtual cursor tracker for the buffer
 volatile uint8_t attr[TNUM];                  //attributes for console
 volatile uint32_t address[TNUM];               //vid mem pointers
 //boolean using n or y
@@ -79,7 +78,7 @@ void keyboard_init(){
     histnum[i] = 0;
     //change for color?
     attr[i] = 0x07;
-    address[i] = term_addr(i);
+    address[i] = 0;//term_addr(i);
   }
   //set global cmd bufs
   for(i=0;i<TNUM;i++){
@@ -102,7 +101,7 @@ void keyboard_init(){
   media = 0;
   //enable req and clear the screen
   enable_irq(1);
-  clear();
+  term_clear(term,0);
   return;
 }
 //update the current terminal
@@ -112,11 +111,9 @@ void update_term(unsigned int t){
 //handles system terminal writes
 int32_t term_write(int32_t fd, const char * buf, int32_t nbytes){
   int bytecnt;
-  int check;
   unsigned int idx;
   idx = fetch_process();
   bytecnt = 0;
-  check = 0;
   //kill if excedes term buffer size
   while(bytecnt < nbytes && bytecnt < BUFMAX){
     term_putc(idx,buf[bytecnt]);
@@ -129,7 +126,7 @@ int32_t term_write(int32_t fd, const char * buf, int32_t nbytes){
 int32_t term_read(int32_t fd, char * buf, int32_t nbytes){
   //start at the cmd
   unsigned int idx = fetch_process();
-  int32_t i;
+  int32_t i,j;
   char c;
   //wait for command completion (spam?)
   while(1){
@@ -152,8 +149,8 @@ int32_t term_read(int32_t fd, char * buf, int32_t nbytes){
     i++;
   }
   //clean up buffer
-  for(i=0;i<BUFMAX;i++){
-    cmd_buf[idx][i] = 0;
+  for(j=0;j<BUFMAX;j++){
+    cmd_buf[idx][j] = 0;
   }
   //reset vals, ret bytes read
   cmd_len[idx] = 0;
@@ -168,9 +165,9 @@ int32_t term_read(int32_t fd, char * buf, int32_t nbytes){
 *   RETURN VALUE: none
 *   SIDE EFFECTS: echo's keypress to screen
 */
+//rewrite to improve speed
 void keyboard_handler(){
   uint8_t scan;           //scancode
-  uint8_t stat;           //statcode
   int i;                  //loop int
 
   cli();                  //disable interrupts for now
@@ -178,26 +175,31 @@ void keyboard_handler(){
     "pushal\n"
     :
     :);
-  stat = inb(STATREG);
-  //take all from keyboard buffer
-  //loop allows for fast typing to fill keyboard buffer
-  while(ANDFULL & stat){
-    scan = inb(DATAPORT);          //get data from key press
-    i = parse_input(scan);         //parse the input
-    if(i == 2){
-      break;                       //stop char encountered
-    }
-    stat = inb(STATREG);           //eval buffer
+  scan = inb(DATAPORT);          //get data from key press
+  i = parse_input(scan);         //parse the input
+  switch (i)
+  {
+    case 0:  //write new char
+      term_putc(term,cmd_buf[cmd_len[term]-1]);
+      cursorX[term]++;
+      move_cursor(term);
+      break;
+    case 1:  //no char write
+      break;
+    case 2:  //stop char encountered, handle
+      i=0;
+      cursorX[term] = CURSOROFF;
+      while(i<cmd_len[term]){
+        term_putc(term,cmd_buf[term][i]);
+        cursorX[term]++;
+        i++;
+      }
+      cursorX[term]++;
+      move_cursor(term);
+      break;
+    default:
+      break;
   }
-  //rectify buf tracker with cursor
-  cursorX[term] = cursorX[term] + bufX[term];
-  bufX[term] = 0;
-  i=0;
-  while(i<cmd_len[term]){          //print whole keyboard buffer
-    term_putc(term,cmd_buf[term][i]);
-    i++;
-  }
-  move_cursor(term);               //redraw the cursor
   sti();                           // reenable interrupts
   send_eoi(1);                     //send end of interrupt signal to irq2
   asm volatile(
@@ -217,11 +219,11 @@ void move_cursor(unsigned int t){
   uint8_t writeH = loc&0xFF00;
   writeH = writeH>>BYTE;
   //write low bits
-  outb(CURSORLA,CURSORLB);
-  outb(CURSORHA,writeL);
+  outb(CURSORLB,CURSORLA);
+  outb(writeL,CURSORHA);
   //write high bits
-  outb(CURSORLA,CURSORHB);
-  outb(CURSORHA,writeH);
+  outb(CURSORHB,CURSORLA);
+  outb(writeH,CURSORHA);
   return;
 }
 //validates the cursor location vars
@@ -277,9 +279,7 @@ int parse_input(uint8_t scancode){
     return ret;
   }
   //needs to be written, insert to build buf
-  insert_char(c,cursorX[term]);
-  ret = 1;
-  return ret;
+  return insert_char(c,cmd_len[term]);
 }
 int process_char(char c){
   int i;
@@ -289,21 +289,23 @@ int process_char(char c){
       termRead[term] = 'y';
       return 2;
     case 127: //delete
-      if(bufX > 0){
-        bufX[term]--;
+      if(cursorX[term] > CURSOROFF){
+        term_putc(term,0);
+        cursorX[term]--;
+        cmd_len[term]--;
+        cmd_buf[term][cmd_len[term]]=0;
       }
-      cmd_len[term]--;
-      cmd_buf[term][cmd_len[term]]=0;
       return 1;
     case 8: //backspace
-      if(bufX > 0){
-        bufX[term]--;
+      if(cursorX[term] > CURSOROFF){
+        term_putc(term,0);
+        cursorX[term]--;
+        cmd_len[term]--;
+        cmd_buf[term][cmd_len[term]]=0;
       }
-      cmd_len[term]--;
-      cmd_buf[term][cmd_len[term]]=0;
       return 1;
     default:
-      break;
+      return 0;
   }
   //check for useless non chars
   for(i=0;i<32;i++){
@@ -315,25 +317,23 @@ int process_char(char c){
   return 0;
 }
 //inserts char to build buffer
-void insert_char(char c, int idx){
+int insert_char(char c, int idx){
   char temp;
   int i;
   //do nothing if buf overflow
   if(idx >= BUFMAX-2 || cmd_len[term] > BUFMAX-1){
-    return;
+    return 1;
   }
   //insert if toggled on
   if(ops && 0x10 == 1){
     cmd_buf[term][idx] = c;
-    bufX[term]++;
-    return;
+    return 0;
   }
   //apped char at end
   if(idx == cmd_len[term]){
     cmd_len[term]++;
-    bufX[term]++;
     cmd_buf[term][idx] = c;
-    return;
+    return 0;
   }
   //insert is inside buf, shift the content after up by 1
   i = cmd_len[term];
@@ -344,13 +344,12 @@ void insert_char(char c, int idx){
   }
   cmd_buf[term][idx] = c;
   cmd_len[term]++;
-  bufX[term]++;
-  return;
+  return 0;
 }
 //handles media key presses
 int process_media(uint8_t scancode){
   int ret;
-  ret = 0;
+  ret = 1;
   switch(scancode)
   {
     case 0x48:  //up arrow
@@ -360,13 +359,15 @@ int process_media(uint8_t scancode){
       }
       return ret;
     case 0x04B: //left arrow
-      if(bufX[term] > 0){
-        bufX[term]--;
+      if(cursorX[term] > BUFMAX){
+        cursorX[term]--;
+        move_cursor(term);
       }
       return 1;
     case 0x04D: //right arrow
-      if(bufX[term] < BUFMAX && cmd_buf[term][cmd_len[term]] != 0){
-        bufX[term]++;
+      if(cursorX[term] < BUFMAX && cmd_buf[term][cursorX[term]-CURSOROFF] != 0){
+        cursorX[term]++;
+        move_cursor(term);
       }
       return 1;
     default:
@@ -387,6 +388,7 @@ int update_ops(uint8_t scancode){
       return 1;
     case 0x1D: //ctrl
       ops = ops | 0x02;
+      term_clear(term,0);
       return 1;
     case 0x3A: //caps
       ops = ops | 0x04;
@@ -415,6 +417,7 @@ int update_ops(uint8_t scancode){
       return 1;
     case 0xD2: //insert
       ops = ops & 0xEF;
+      return 1;
     default:   //no ops
       return 0;
   }
@@ -519,21 +522,17 @@ unsigned int fetch_process(){
   return id;
 }
 //puts char at loc based on given cursor loc
-extern void term_putc(unsigned int t, uint8_t c){
+void term_putc(unsigned int t, uint8_t c){
   //do same as putc
   if(USEPAGE == 0){
     //use standard vmem address
     address[t] = 0xB8000;
   }
-  if(c == '\n') {
-      cursorY[t]++;
-      cursorX[t] = 0;
-      return;
+  if(cursorY[t] * XMAX + cursorX[t] > XMAX*YMAX){
+    return;
   }
-  else {
-      *(uint8_t *)(address[t] + ((XMAX * cursorY[t] + cursorX[t]) << 1)) = c;
-      *(uint8_t *)(address[t] + ((XMAX * cursorY[t] + cursorX[t]) << 1) + 1) = attr[t];
-  }
+  *(uint8_t *)(address[t] + ((XMAX * cursorY[t] + cursorX[t]) << 1)) = c;
+  *(uint8_t *)(address[t] + ((XMAX * cursorY[t] + cursorX[t]) << 1) + 1) = attr[t];
   return;
 }
 //clear and reset the terminal for use
@@ -542,6 +541,7 @@ void term_clear(unsigned int t, int op){
 
   cursorX[t] = 0;
   cursorY[t] = 0;
+  ops = 0;
   //do reg clear if not paging
   if(USEPAGE == 0){
     clear();
@@ -558,6 +558,13 @@ void term_clear(unsigned int t, int op){
     term_putc(t,prompt[i]);
     cursorX[t]++;
   }
+  //clear buffer as well
+  if(op == 0){
+    for(i=0;i<BUFMAX;i++){
+      cmd_buf[t][i] = 0;
+    }
+    cmd_len[t]=0;
+  }
   //caller chose to add buffer to screen
   if(op == 1){
     cnt = 0;
@@ -570,6 +577,8 @@ void term_clear(unsigned int t, int op){
       }
       cnt++;
     }
+    cursorX[t]++;
   }
+  move_cursor(t);
   return;
 }

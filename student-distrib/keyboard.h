@@ -25,7 +25,7 @@
 extern void keyboard_init();
 extern void update_term(unsigned int term);
 extern void keyboard_handler();
-extern void move_cursor();
+extern void move_cursor(unsigned int t);
 extern unsigned int fetch_process();
 extern int32_t term_write(int32_t fd, const char * buf, int32_t nbytes);
 extern int32_t term_read(int32_t fd, char * buf, int32_t nbytes);
@@ -37,7 +37,7 @@ int process_media(uint8_t scancode);
 int parse_input(uint8_t scancode);
 int update_ops(uint8_t scancode);
 char generate_char(uint8_t scancode);
-void insert_char(char c, int idx);
+int insert_char(char c, int idx);
 void validate_cursor(uint8_t t);
 //extras
 void history_fetch(int idx);

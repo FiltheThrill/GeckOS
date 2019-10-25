@@ -26,6 +26,7 @@ void term_init(){
   for(i=0;i<TNUM;i++){
     termmem[i] = paging_terminal(v,p);
   }
+  return;
 }
 
 int term_start(unsigned int num){
@@ -37,7 +38,7 @@ int term_start(unsigned int num){
     return -1;
   }
   //running, switch back to it
-  if(termrun[num] = 'y'){
+  if(termrun[num] == 'y'){
     term_swap(num);
     sti();
     return 0;
@@ -57,6 +58,6 @@ void term_swap(unsigned int term){
   term_clear(term,1);
   return;
 }
-extern uint8_t term_addr(unsigned int term){
+uint8_t term_addr(unsigned int term){
   return termmem[term];
 }

@@ -62,7 +62,7 @@ void i8259_init(void) {
 void enable_irq(uint32_t irq_num) {
   uint8_t int_mask;
 
-  int_mask = (irq_num & 0x0111);      // get bottom 3 bits of either PIC interrupt
+  int_mask = (irq_num & 0x07);      // get bottom 3 bits of either PIC interrupt
   int_mask = ~(1 << int_mask);        //shift 1 over to correct unmasking location and then flip it
 
   if(irq_num >= 8)
@@ -92,7 +92,7 @@ void disable_irq(uint32_t irq_num) {
   unsigned long flags;
 
 
-  int_mask = (irq_num & 0x0111);      // get bottom 3 bits of either PIC interrupt
+  int_mask = (irq_num & 0x07);      // get bottom 3 bits of either PIC interrupt
   int_mask = 1 << int_mask;        //shift 1 over to correct masking location
 
   cli_and_save(flags);      //not sure if needed
@@ -133,7 +133,7 @@ void send_eoi(uint32_t irq_num) {
   }
   else
   {
-    outb(EOI | (irq_num & 0x0111), SLAVE_8259_PORT);   //make sure to send eoi to master irq2 as well
+    outb(EOI | (irq_num & 0x07), SLAVE_8259_PORT);   //make sure to send eoi to master irq2 as well
     outb(EOI | 0x02, MASTER_8259_PORT);
   }
   asm volatile(
