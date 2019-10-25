@@ -9,9 +9,15 @@
 #define PIE_EN		0x40
 #define REG_C		0x0C
 
+#define RTC_SUCCESS	0
+#define RTC_FAIL	-1
+
 void rtc_init();
 extern void RTC_handler();
 
-
+int32_t rtc_read(int32_t fd, void* buf, int32_t nbytes);
+int32_t rtc_write(int32_t fd, void* buf, int32_t nbytes);
+int32_t rtc_open(const uint8_t* filename);
+int32_t rtc_close(int32_t fd);
 
 #endif
