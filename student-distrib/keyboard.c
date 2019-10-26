@@ -44,7 +44,7 @@ static char prompt[CURSOROFF] = {'[','t','e','r','m',']',':',' '};
 volatile unsigned int term;                   //global for current terminal 0,(1,2,3,4 for multiterm)
 //[x,x,x,ins,alt,caps,ctrl,shift]
 volatile unsigned char ops;                   //char to store modifiers
-volatile int media;                           //op for media key presses
+volatile unsigned int cursoff[TNUM];          //used to add terminal prompt
 volatile unsigned int cmd_len[TNUM];          //global for each command length
 volatile char cmd_buf[TNUM][BUFMAX];          //global cmd store for any terminal
 volatile unsigned int cursorX[TNUM];          //cursor x val
@@ -73,9 +73,10 @@ void keyboard_init(){
   for(i=0;i<TNUM;i++){
     termRead[i] = 'n';
     cmd_len[i] = 0;
-    cursorX[i] = CURSOROFF;
+    cursorX[i] = 0;
     cursorY[i] = 0;
     histnum[i] = 0;
+    cursoff[i] = CURSOROFF;
     //change for color?
     attr[i] = 0x07;
     address[i] = 0;//term_addr(i);
@@ -98,7 +99,6 @@ void keyboard_init(){
   //set term num to first term (0)
   term = 0;
   ops = 0;
-  media = 0;
   //enable req and clear the screen
   enable_irq(1);
   term_clear(term,0);
@@ -114,6 +114,9 @@ int32_t term_write(int32_t fd, const char * buf, int32_t nbytes){
   unsigned int idx;
   idx = fetch_process();
   bytecnt = 0;
+  //no offset for term writes
+  cursoff[idx] = 0;
+  term_clear(idx,0);
   //kill if excedes term buffer size
   while(bytecnt < nbytes && bytecnt < BUFMAX){
     term_putc(idx,buf[bytecnt]);
@@ -180,22 +183,24 @@ void keyboard_handler(){
   switch (i)
   {
     case 0:  //write new char
-      term_putc(term,cmd_buf[cmd_len[term]-1]);
+      term_putc(term,cmd_buf[term][cmd_len[term]-1]);
       cursorX[term]++;
       move_cursor(term);
       break;
-    case 1:  //no char write
+    case 1:  //no char write, handled in cases
       break;
     case 2:  //stop char encountered, handle
       i=0;
-      cursorX[term] = CURSOROFF;
+      cursorX[term] = cursoff[term];
       while(i<cmd_len[term]){
         term_putc(term,cmd_buf[term][i]);
         cursorX[term]++;
         i++;
       }
-      cursorX[term]++;
       move_cursor(term);
+      break;
+    case 3:  //debug case
+      term_putc(term,'Q');
       break;
     default:
       break;
@@ -233,8 +238,9 @@ void validate_cursor(uint8_t t){
     cursorY[t]++;
     cursorX[t] = cursorX[t] - XMAX;
   }
-  if(cursorX[t] < CURSOROFF){
-    cursorX[t] = CURSOROFF;
+  //dont overwrite prompt
+  if(cursorX[t] < cursoff[t] && cmd_len[t] < 6){
+    cursorX[t] = cursoff[t];
   }
   //end of screen
   if(cursorY[t] * XMAX + cursorX[t] > XMAX*YMAX){
@@ -243,17 +249,11 @@ void validate_cursor(uint8_t t){
     return;
   }
 }
-//ret 0 for inaction, 1 for next, 2 for stop
+//ret 0 for char wrote, 1 for non char write input, 2 for stop input
 int parse_input(uint8_t scancode){
   int ret;
   char c;
 
-  //check for indicator of media keys
-  //next value will be the actual key
-  if(scancode == 0xE0){
-    media = 1;
-    return 1;
-  }
   //update the ops
   ret = update_ops(scancode);
   if(ret == 1){
@@ -261,16 +261,15 @@ int parse_input(uint8_t scancode){
     return ret;
   }
   //handle media key input
-  if(media == 1){
-    ret = process_media(scancode);
-    media = 0;
+  ret = process_media(scancode);
+  if(ret == 1 || ret == 2){
     return ret;
   }
   //must be in the char array
   c = generate_char(scancode);
-  ret = 1;
   if(c == 0){
     //didnot generate useful char
+    ret = 1;
     return ret;
   }
   ret = process_char(c);
@@ -289,23 +288,31 @@ int process_char(char c){
       termRead[term] = 'y';
       return 2;
     case 127: //delete
-      if(cursorX[term] > CURSOROFF){
-        term_putc(term,0);
+      if(cursorX[term] > cursoff[term]){
         cursorX[term]--;
         cmd_len[term]--;
         cmd_buf[term][cmd_len[term]]=0;
+        term_putc(term,0);
+        move_cursor(term);
       }
       return 1;
     case 8: //backspace
-      if(cursorX[term] > CURSOROFF){
-        term_putc(term,0);
+      if(cursorX[term] > cursoff[term]){
         cursorX[term]--;
         cmd_len[term]--;
         cmd_buf[term][cmd_len[term]]=0;
+        term_putc(term,0);
+        move_cursor(term);
       }
       return 1;
+    case 'l':  //CTRL + l
+      if(ops && 0x02 == ops){
+        term_clear(term,0);
+        return 1;
+      }
+      break;
     default:
-      return 0;
+      break;
   }
   //check for useless non chars
   for(i=0;i<32;i++){
@@ -320,19 +327,26 @@ int process_char(char c){
 int insert_char(char c, int idx){
   char temp;
   int i;
+  if(idx < 0){
+    return 1;
+  }
   //do nothing if buf overflow
   if(idx >= BUFMAX-2 || cmd_len[term] > BUFMAX-1){
     return 1;
   }
+  //check for invalid insert idx
+  if(idx > cmd_len[term]){
+    return 3;
+  }
   //insert if toggled on
-  if(ops && 0x10 == 1){
+  if(ops && 0x10 == ops){
     cmd_buf[term][idx] = c;
     return 0;
   }
   //apped char at end
   if(idx == cmd_len[term]){
-    cmd_len[term]++;
     cmd_buf[term][idx] = c;
+    cmd_len[term]++;
     return 0;
   }
   //insert is inside buf, shift the content after up by 1
@@ -348,8 +362,6 @@ int insert_char(char c, int idx){
 }
 //handles media key presses
 int process_media(uint8_t scancode){
-  int ret;
-  ret = 1;
   switch(scancode)
   {
     case 0x48:  //up arrow
@@ -357,15 +369,15 @@ int process_media(uint8_t scancode){
         history_fetch(term);
         return 2;
       }
-      return ret;
+      return 1;
     case 0x04B: //left arrow
-      if(cursorX[term] > BUFMAX){
+      if(cursorX[term] > cursoff[term] && cmd_len[term] > 0){
         cursorX[term]--;
         move_cursor(term);
       }
       return 1;
     case 0x04D: //right arrow
-      if(cursorX[term] < BUFMAX && cmd_buf[term][cursorX[term]-CURSOROFF] != 0){
+      if(cursorX[term] < BUFMAX && cmd_buf[term][cursorX[term]-cursoff[term]] != 0){
         cursorX[term]++;
         move_cursor(term);
       }
@@ -388,7 +400,6 @@ int update_ops(uint8_t scancode){
       return 1;
     case 0x1D: //ctrl
       ops = ops | 0x02;
-      term_clear(term,0);
       return 1;
     case 0x3A: //caps
       ops = ops | 0x04;
@@ -427,6 +438,11 @@ int update_ops(uint8_t scancode){
 char generate_char(uint8_t scancode){
   char c;
   c = 0; //will ret if no char made
+
+  //make sure not out of bounds
+  if(scancode > 0x53){
+    return c;
+  }
   switch(ops)
   {
     case 0:        //no flags
@@ -554,7 +570,7 @@ void term_clear(unsigned int t, int op){
     }
   }
   //print prompt
-  for(i=0;i<CURSOROFF;i++){
+  for(i=0;i<cursoff[term];i++){
     term_putc(t,prompt[i]);
     cursorX[t]++;
   }
