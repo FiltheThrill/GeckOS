@@ -12,6 +12,7 @@
 #include "keyboard.h"
 #include "rtc.h"
 #include "paging.h"
+#include "files.h"
 
 #define RUN_TESTS
 
@@ -24,7 +25,7 @@
 void entry(unsigned long magic, unsigned long addr) {
 
     multiboot_info_t *mbi;
-
+    int32_t boot;
     /* Clear the screen. */
     clear();
 
@@ -56,6 +57,7 @@ void entry(unsigned long magic, unsigned long addr) {
         int mod_count = 0;
         int i;
         module_t* mod = (module_t*)mbi->mods_addr;
+        boot = (int32_t)mod->mod_start;
         while (mod_count < mbi->mods_count) {
             printf("Module %d loaded at address: 0x%#x\n", mod_count, (unsigned int)mod->mod_start);
             printf("Module %d ends at address: 0x%#x\n", mod_count, (unsigned int)mod->mod_end);
@@ -148,7 +150,11 @@ void entry(unsigned long magic, unsigned long addr) {
 	rtc_init();
 	/* Init paging */
 	paging_init();
-
+  clear();
+  //printf("trying to initialize\n");
+  //printf("%d \n", boot);
+  files_init(boot);
+//  printf("files initialized\n");
     /* Initialize devices, memory, filesystem, enable device interrupts on the
      * PIC, any other initialization stuff... */
 

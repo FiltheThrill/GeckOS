@@ -1,6 +1,8 @@
 #include "tests.h"
 #include "x86_desc.h"
 #include "lib.h"
+#include "files.h"
+#include "types.h"
 
 #define INBOUND	0xB8000
 #define OUTBOUND	0x800000
@@ -11,7 +13,8 @@
 #define DIVTEST 0
 #define PAGETEST 0
 #define DEREFTEST 0
-#define VALIDPAGETEST 1
+#define VALIDPAGETEST 0
+#define READFRAME1 1
 
 /* format these macros as you see fit */
 #define TEST_HEADER 	\
@@ -128,6 +131,28 @@ int deref_null_test()
 }
 
 /* Checkpoint 2 tests */
+void read_frame1()
+{
+	//TEST_HEADER;
+	int result = PASS;
+	printf("starting frame1 read \n");
+	const uint8_t* fname = (const uint8_t*)"frame1.txt";
+	int32_t check;
+	uint8_t buf[200];
+	int bytes;
+	int i;
+	check = fopen(fname);
+	if(check == -1)
+	{
+		printf("unable to open file");
+		result = FAIL;
+	}
+//	printf("Reading...\n");
+	bytes = fread(buf, 0, 200);
+	//printf("Read!\n");
+	puts(buf);
+//	return result;
+}
 /* Checkpoint 3 tests */
 /* Checkpoint 4 tests */
 /* Checkpoint 5 tests */
@@ -135,7 +160,7 @@ int deref_null_test()
 
 /* Test suite entry point */
 void launch_tests(){
-	TEST_OUTPUT("idt_test", idt_test());
+	//TEST_OUTPUT("idt_test", idt_test());
 	#if (DIVTEST == 1)
 		TEST_OUTPUT("Divide by 0 test", div_by_0_test());
 	#endif
@@ -148,5 +173,8 @@ void launch_tests(){
 	#endif
 	#if (DEREFTEST == 1)
 		TEST_OUTPUT("Dereference NULL test", deref_null_test());
+	#endif
+	#if (READFRAME1 == 1)
+			read_frame1();
 	#endif
 }
