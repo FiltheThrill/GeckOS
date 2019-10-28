@@ -3,6 +3,7 @@
 #include "lib.h"
 #include "files.h"
 #include "types.h"
+#include "rtc.h"
 
 #define INBOUND	0xB8000
 #define OUTBOUND	0x800000
@@ -20,6 +21,7 @@
 #define READCAT   0
 #define READTEST  0
 #define READDIR 0
+#define RTCTEST 0
 /* format these macros as you see fit */
 #define TEST_HEADER 	\
 	printf("[TEST %s] Running %s at %s:%d\n", __FUNCTION__, __FUNCTION__, __FILE__, __LINE__)
@@ -317,6 +319,144 @@ void read_dir()
 	}
 	dclose(fname);
 }
+
+/*
+* rtc_tests
+ * Asserts that the rtc frequency can be changed
+ * Inputs: None
+ * Outputs: PASS
+ * Side Effects: None
+ * Coverage: rtc_read/write/open/close
+ * Files: rtc.c/h
+ */
+int rtc_tests()
+{
+	TEST_HEADER;
+	int result = PASS;
+	int i;
+	
+	// random values not used
+	const uint8_t* fname = (const uint8_t*)"";
+	// check if we are successfull in all our operations
+	int32_t check_open, check_close, check_read, check_write;
+	check_open = rtc_open(fname);
+	if (check_open == -1)
+	{
+		printf("unable to open rtc");
+		result = FAIL;
+	}
+	
+	// more garbage vars
+	uint8_t buf[1];
+	int bytes;
+
+	// clear the screen for the test
+	clear();
+
+	// since we opened the rtc the freq = 2Hz
+	// test this by printing 15 ones when the next interrupt occurs (rtc_read returns)
+	for (i = 0; i < 15; i++)
+	{
+		check_read = rtc_read(0, buf, bytes);
+		printf("1");
+	}
+	printf("\n");
+	
+	//test 4 Hz
+	check_write = rtc_write(0, buf, 4);
+	for (i = 0; i < 15; i++)
+	{
+		check_read = rtc_read(0, buf, bytes);
+		printf("1");
+	}
+	
+	printf("\n");
+	
+	//test 8 Hz, then 16, then 32, then 64, then ... 1024
+	check_write = rtc_write(0, buf, 8);
+	for (i = 0; i < 15; i++)
+	{
+		check_read = rtc_read(0, buf, bytes);
+		printf("1");
+	}
+	
+	printf("\n");
+	
+	check_write = rtc_write(0, buf, 16);
+	for (i = 0; i < 15; i++)
+	{
+		check_read = rtc_read(0, buf, bytes);
+		printf("1");
+	}
+	
+	printf("\n");
+	
+	check_write = rtc_write(0, buf, 32);
+	for (i = 0; i < 15; i++)
+	{
+		check_read = rtc_read(0, buf, bytes);
+		printf("1");
+	}
+	
+	printf("\n");
+	
+	check_write = rtc_write(0, buf, 64);
+	for (i = 0; i < 15; i++)
+	{
+		check_read = rtc_read(0, buf, bytes);
+		printf("1");
+	}
+	
+	printf("\n");
+	
+	check_write = rtc_write(0, buf, 128);
+	for (i = 0; i < 15; i++)
+	{
+		check_read = rtc_read(0, buf, bytes);
+		printf("1");
+	}
+	
+	printf("\n");
+	
+	check_write = rtc_write(0, buf, 256);
+	for (i = 0; i < 15; i++)
+	{
+		check_read = rtc_read(0, buf, bytes);
+		printf("1");
+	}
+	
+	printf("\n");
+	
+	check_write = rtc_write(0, buf, 512);
+	for (i = 0; i < 15; i++)
+	{
+		check_read = rtc_read(0, buf, bytes);
+		printf("1");
+	}
+	
+	printf("\n");
+	
+	check_write = rtc_write(0, buf, 1024);
+	for (i = 0; i < 15; i++)
+	{
+		check_read = rtc_read(0, buf, bytes);
+		printf("1");
+	}
+	
+	printf("\n");
+
+	// close the rtc (do nothing)
+	check_close = rtc_close(check_open);
+	if (check_close == -1)
+	{
+		printf("unable to close rtc");
+		result = FAIL;
+	}
+	
+	// return PASS!
+	return result;
+}
+
 /* Checkpoint 3 tests */
 /* Checkpoint 4 tests */
 /* Checkpoint 5 tests */
@@ -355,5 +495,8 @@ void launch_tests(){
 	#endif
 	#if (READDIR == 1)
 			read_dir();
+	#endif
+	#if (RTCTEST == 1)
+		TEST_OUTPUT("Test our RTC", rtc_tests());
 	#endif
 }
