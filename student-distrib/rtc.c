@@ -3,9 +3,9 @@ Author - Frankie Papa
 https://wiki.osdev.org/RTC
 https://courses.engr.illinois.edu/ece391/fa2019/secure/references/ds12887.pdf
  */
-#include "rtc.h"
 #include "lib.h"
 #include "i8259.h"
+#include "rtc.h"
 
 volatile int rtc_interrupt_flag;
 
@@ -26,7 +26,9 @@ void rtc_init()
 	outb(prev | PIE_EN, CMOS_PORT); // Turn on Periodic Interrupt Enable bit
 	sti(); // enable interrupts
 	
-	rtc_open();
+	const uint8_t* fname = (const uint8_t*)"";
+	int32_t open = rtc_open(fname);
+	open++;
 	
 	outb(REG_C, RTC_PORT); // allow interrupts to occur again
 	inb(CMOS_PORT);

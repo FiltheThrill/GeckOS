@@ -1,6 +1,7 @@
 #include "tests.h"
 #include "x86_desc.h"
 #include "lib.h"
+#include "rtc.h"
 
 #define INBOUND	0xB8000
 #define OUTBOUND	0x800000
@@ -134,6 +135,7 @@ int rtc_tests()
 {
 	TEST_HEADER;
 	int result = PASS;
+	int i;
 	
 	const uint8_t* fname = (const uint8_t*)"";
 	int32_t check_open, check_close, check_read, check_write;
@@ -147,74 +149,95 @@ int rtc_tests()
 	uint8_t buf[1];
 	int bytes;
 
-	for (int i = 0; i < 20; i++)
+	clear();
+
+	for (i = 0; i < 15; i++)
 	{
 		check_read = rtc_read(0, buf, bytes);
 		printf("1");
 	}
+	printf("\n");
 	
 	check_write = rtc_write(0, buf, 4);
-	for (i = 0, i < 20; i++)
+	for (i = 0; i < 15; i++)
 	{
 		check_read = rtc_read(0, buf, bytes);
 		printf("1");
 	}
+	
+	printf("\n");
 	
 	check_write = rtc_write(0, buf, 8);
-	for (i = 0, i < 20; i++)
+	for (i = 0; i < 15; i++)
 	{
 		check_read = rtc_read(0, buf, bytes);
 		printf("1");
 	}
+	
+	printf("\n");
 	
 	check_write = rtc_write(0, buf, 16);
-	for (i = 0, i < 20; i++)
+	for (i = 0; i < 15; i++)
 	{
 		check_read = rtc_read(0, buf, bytes);
 		printf("1");
 	}
+	
+	printf("\n");
 	
 	check_write = rtc_write(0, buf, 32);
-	for (i = 0, i < 20; i++)
+	for (i = 0; i < 15; i++)
 	{
 		check_read = rtc_read(0, buf, bytes);
 		printf("1");
 	}
+	
+	printf("\n");
 	
 	check_write = rtc_write(0, buf, 64);
-	for (i = 0, i < 20; i++)
+	for (i = 0; i < 15; i++)
 	{
 		check_read = rtc_read(0, buf, bytes);
 		printf("1");
 	}
+	
+	printf("\n");
 	
 	check_write = rtc_write(0, buf, 128);
-	for (i = 0, i < 20; i++)
+	for (i = 0; i < 15; i++)
 	{
 		check_read = rtc_read(0, buf, bytes);
 		printf("1");
 	}
+	
+	printf("\n");
 	
 	check_write = rtc_write(0, buf, 256);
-	for (i = 0, i < 20; i++)
+	for (i = 0; i < 15; i++)
 	{
 		check_read = rtc_read(0, buf, bytes);
 		printf("1");
 	}
+	
+	printf("\n");
 	
 	check_write = rtc_write(0, buf, 512);
-	for (i = 0, i < 20; i++)
+	for (i = 0; i < 15; i++)
 	{
 		check_read = rtc_read(0, buf, bytes);
 		printf("1");
 	}
 	
+	printf("\n");
+	
 	check_write = rtc_write(0, buf, 1024);
-	for (i = 0, i < 20; i++)
+	for (i = 0; i < 15; i++)
 	{
 		check_read = rtc_read(0, buf, bytes);
 		printf("1");
 	}
+	
+	printf("\n");
 
 	check_close = rtc_close(check_open);
 	if (check_close == -1)
