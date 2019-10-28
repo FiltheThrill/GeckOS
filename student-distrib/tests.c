@@ -13,7 +13,7 @@
 #define PAGETEST 0
 #define DEREFTEST 0
 #define VALIDPAGETEST 0
-#define RTCTEST 0
+#define RTCTEST 1
 
 /* format these macros as you see fit */
 #define TEST_HEADER 	\
@@ -144,10 +144,10 @@ int rtc_tests()
 {
 	TEST_HEADER;
 	int result = PASS;
-	int i;
+	int i, j;
 	
 	// random values not used
-	const uint8_t* fname = (const uint8_t*)"";
+	const uint8_t* fname = (const uint8_t*)"rtc_f";
 	// check if we are successfull in all our operations
 	int32_t check_open, check_close, check_read, check_write;
 	check_open = rtc_open(fname);
@@ -173,88 +173,20 @@ int rtc_tests()
 	}
 	printf("\n");
 	
-	//test 4 Hz
-	check_write = rtc_write(0, buf, 4);
-	for (i = 0; i < 15; i++)
+	//test 4 Hz, then 8, then 16, then 32, then 64, then ... 1024
+	
+	for (i = 4; i < 2048; i *= 2)
 	{
-		check_read = rtc_read(0, buf, bytes);
-		printf("1");
+		//set new frequency
+		check_write = rtc_write(0, buf, i);
+		for (j = 0; j < 15; j++)
+		{
+			//print 15 1s at this frequency using rtc_read to block printing until next interrupt
+			check_read = rtc_read(0, buf, bytes);
+			printf("1");
+		}
+		printf("\n");
 	}
-	
-	printf("\n");
-	
-	//test 8 Hz, then 16, then 32, then 64, then ... 1024
-	check_write = rtc_write(0, buf, 8);
-	for (i = 0; i < 15; i++)
-	{
-		check_read = rtc_read(0, buf, bytes);
-		printf("1");
-	}
-	
-	printf("\n");
-	
-	check_write = rtc_write(0, buf, 16);
-	for (i = 0; i < 15; i++)
-	{
-		check_read = rtc_read(0, buf, bytes);
-		printf("1");
-	}
-	
-	printf("\n");
-	
-	check_write = rtc_write(0, buf, 32);
-	for (i = 0; i < 15; i++)
-	{
-		check_read = rtc_read(0, buf, bytes);
-		printf("1");
-	}
-	
-	printf("\n");
-	
-	check_write = rtc_write(0, buf, 64);
-	for (i = 0; i < 15; i++)
-	{
-		check_read = rtc_read(0, buf, bytes);
-		printf("1");
-	}
-	
-	printf("\n");
-	
-	check_write = rtc_write(0, buf, 128);
-	for (i = 0; i < 15; i++)
-	{
-		check_read = rtc_read(0, buf, bytes);
-		printf("1");
-	}
-	
-	printf("\n");
-	
-	check_write = rtc_write(0, buf, 256);
-	for (i = 0; i < 15; i++)
-	{
-		check_read = rtc_read(0, buf, bytes);
-		printf("1");
-	}
-	
-	printf("\n");
-	
-	check_write = rtc_write(0, buf, 512);
-	for (i = 0; i < 15; i++)
-	{
-		check_read = rtc_read(0, buf, bytes);
-		printf("1");
-	}
-	
-	printf("\n");
-	
-	check_write = rtc_write(0, buf, 1024);
-	for (i = 0; i < 15; i++)
-	{
-		check_read = rtc_read(0, buf, bytes);
-		printf("1");
-	}
-	
-	printf("\n");
 
 	// close the rtc (do nothing)
 	check_close = rtc_close(check_open);
