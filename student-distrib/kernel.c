@@ -153,9 +153,9 @@ void entry(unsigned long magic, unsigned long addr) {
     /* Init the keyboard */
     keyboard_init();
 	   /* Init the RTC */
-	  rtc_init();
-    /* init files */
-    files_init(boot);
+	   rtc_init();
+     /* init files */
+     files_init(boot);
     /* Initialize devices, memory, filesystem, enable device interrupts on the
      * PIC, any other initialization stuff... */
 
