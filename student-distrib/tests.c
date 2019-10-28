@@ -17,11 +17,11 @@
 #define VALIDPAGETEST 0
 #define READFRAME1 0
 #define READFRAME0 0
-#define READLARGE 1
+#define READLARGE 0
 #define READCAT   0
 #define READTEST  0
 #define READDIR 0
-#define RTCTEST 0
+#define RTCTEST 1
 /* format these macros as you see fit */
 #define TEST_HEADER 	\
 	printf("[TEST %s] Running %s at %s:%d\n", __FUNCTION__, __FUNCTION__, __FILE__, __LINE__)

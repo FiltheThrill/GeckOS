@@ -145,7 +145,7 @@ void entry(unsigned long magic, unsigned long addr) {
     /* Init the PIC */
     i8259_init();
     /* Init the keyboard */
-    open_keyboard_irq();
+    keyboard_init();
 	/* Init the RTC */
 	rtc_init();
 	/* Init paging */
