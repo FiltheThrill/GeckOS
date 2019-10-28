@@ -4,6 +4,8 @@
 #include "files.h"
 #include "types.h"
 #include "rtc.h"
+#include "keyboard.h"
+#include "terminal.h"
 
 #define INBOUND	0xB8000
 #define OUTBOUND	0x800000
@@ -17,11 +19,13 @@
 #define VALIDPAGETEST 0
 #define READFRAME1 0
 #define READFRAME0 0
-#define READLARGE 1
+#define READLARGE 0
 #define READCAT   0
 #define READTEST  0
 #define READDIR 0
 #define RTCTEST 0
+#define KEYTEST 0
+#define TERMTEST 1
 /* format these macros as you see fit */
 #define TEST_HEADER 	\
 	printf("[TEST %s] Running %s at %s:%d\n", __FUNCTION__, __FUNCTION__, __FILE__, __LINE__)
@@ -264,6 +268,8 @@ void read_cat()
 void read_test()
 {
 	int result = PASS;
+	int32_t fd = 1;
+
 	const uint8_t* fname = (const uint8_t*)"testprint";
 	int32_t check;
 	uint8_t buf[445];
@@ -276,11 +282,12 @@ void read_test()
 		result = FAIL;
 	}
 
-	bytes = fread(buf, 4800, 445);
+	bytes = fread(buf, 5151, 445);
 	for(i = 0; i < bytes; i++)
 	{
-		putc(buf[i]);
+		//term_putc(0,buf[i]);
 	}
+	term_write(fd, buf, bytes);
 	fclose(fname);
 }
 
@@ -334,7 +341,7 @@ int rtc_tests()
 	TEST_HEADER;
 	int result = PASS;
 	int i;
-	
+
 	// random values not used
 	const uint8_t* fname = (const uint8_t*)"";
 	// check if we are successfull in all our operations
@@ -345,7 +352,7 @@ int rtc_tests()
 		printf("unable to open rtc");
 		result = FAIL;
 	}
-	
+
 	// more garbage vars
 	uint8_t buf[1];
 	int bytes;
@@ -361,7 +368,7 @@ int rtc_tests()
 		printf("1");
 	}
 	printf("\n");
-	
+
 	//test 4 Hz
 	check_write = rtc_write(0, buf, 4);
 	for (i = 0; i < 15; i++)
@@ -369,9 +376,9 @@ int rtc_tests()
 		check_read = rtc_read(0, buf, bytes);
 		printf("1");
 	}
-	
+
 	printf("\n");
-	
+
 	//test 8 Hz, then 16, then 32, then 64, then ... 1024
 	check_write = rtc_write(0, buf, 8);
 	for (i = 0; i < 15; i++)
@@ -379,70 +386,70 @@ int rtc_tests()
 		check_read = rtc_read(0, buf, bytes);
 		printf("1");
 	}
-	
+
 	printf("\n");
-	
+
 	check_write = rtc_write(0, buf, 16);
 	for (i = 0; i < 15; i++)
 	{
 		check_read = rtc_read(0, buf, bytes);
 		printf("1");
 	}
-	
+
 	printf("\n");
-	
+
 	check_write = rtc_write(0, buf, 32);
 	for (i = 0; i < 15; i++)
 	{
 		check_read = rtc_read(0, buf, bytes);
 		printf("1");
 	}
-	
+
 	printf("\n");
-	
+
 	check_write = rtc_write(0, buf, 64);
 	for (i = 0; i < 15; i++)
 	{
 		check_read = rtc_read(0, buf, bytes);
 		printf("1");
 	}
-	
+
 	printf("\n");
-	
+
 	check_write = rtc_write(0, buf, 128);
 	for (i = 0; i < 15; i++)
 	{
 		check_read = rtc_read(0, buf, bytes);
 		printf("1");
 	}
-	
+
 	printf("\n");
-	
+
 	check_write = rtc_write(0, buf, 256);
 	for (i = 0; i < 15; i++)
 	{
 		check_read = rtc_read(0, buf, bytes);
 		printf("1");
 	}
-	
+
 	printf("\n");
-	
+
 	check_write = rtc_write(0, buf, 512);
 	for (i = 0; i < 15; i++)
 	{
 		check_read = rtc_read(0, buf, bytes);
 		printf("1");
 	}
-	
+
 	printf("\n");
-	
+
 	check_write = rtc_write(0, buf, 1024);
 	for (i = 0; i < 15; i++)
 	{
 		check_read = rtc_read(0, buf, bytes);
 		printf("1");
 	}
-	
+
 	printf("\n");
 
 	// close the rtc (do nothing)
@@ -452,11 +459,27 @@ int rtc_tests()
 		printf("unable to close rtc");
 		result = FAIL;
 	}
-	
+
 	// return PASS!
 	return result;
 }
 
+//blank handler to allow for typing
+void key_test(){
+	term_clear(0,0);
+	return;
+}
+
+void term_test(){
+	int32_t fd = 0;
+	uint8_t buf[128];
+	int32_t nbytes = 128;
+	int32_t write;
+
+	term_clear(0,0);
+	write = term_read(fd,buf,nbytes);
+	term_write(fd,buf,write);
+}
 /* Checkpoint 3 tests */
 /* Checkpoint 4 tests */
 /* Checkpoint 5 tests */
@@ -464,7 +487,6 @@ int rtc_tests()
 
 /* Test suite entry point */
 void launch_tests(){
-	//TEST_OUTPUT("idt_test", idt_test());
 	#if (DIVTEST == 1)
 		TEST_OUTPUT("Divide by 0 test", div_by_0_test());
 	#endif
@@ -498,5 +520,11 @@ void launch_tests(){
 	#endif
 	#if (RTCTEST == 1)
 		TEST_OUTPUT("Test our RTC", rtc_tests());
+	#endif
+	#if (KEYTEST == 1)
+		key_test();
+	#endif
+	#if (TERMTEST == 1)
+		term_test();
 	#endif
 }

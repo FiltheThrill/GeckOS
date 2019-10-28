@@ -15,24 +15,24 @@ https://wiki.osdev.org/Text_Mode_Cursor
 //static vars
 //lowercase translational table with numbers
 static char scancode_lower[] = {0, 0, '1', '2', '3', '4', '5', '6', '7', '8', '9', '0',
-                            '-', '=', 0, 0, 'q', 'w', 'e', 'r', 't', 'y', 'u',
-                            'i', 'o', 'p', '[', ']', '\n', 0, 'a', 's', 'd', 'f','g',
+                            '-', '=', 0x08, 0x09, 'q', 'w', 'e', 'r', 't', 'y', 'u',
+                            'i', 'o', 'p', '[', ']', 0x0D, 0, 'a', 's', 'd', 'f','g',
                             'h', 'j', 'k', 'l', ';', 0x27, 0x60, 0, 0x5c, 'z', 'x', 'c',
                             'v', 'b', 'n', 'm', ',', '.', '/', 0, '*', 0, ' ', 0, 0,
                              0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, '7', '8', '9', '-', '4',
                             '5', '6', '+', '1', '2', '3', '0', '.'};
 //uppercase translational table with special chars
 static char scancode_upper[] = {0, 0, '!', '@', '#', '$', '%', '^', '&', '*', '(', ')',
-                            '_', '+', 0, 0, 'Q', 'W', 'E', 'R', 'T', 'Y', 'U',
-                            'I', 'O', 'P', '{', '}', '\n', 0, 'A', 'S', 'D', 'F','G',
+                            '_', '+', 0x08, 0x09, 'Q', 'W', 'E', 'R', 'T', 'Y', 'U',
+                            'I', 'O', 'P', '{', '}', 0x0D, 0, 'A', 'S', 'D', 'F','G',
                             'H', 'J', 'K', 'L', ':', 0x27, 0x60, 0, 0x5c, 'Z', 'X', 'C',
                             'V', 'B', 'N', 'M', '<', '>', '?', 0, '*', 0, ' ', 0, 0,
                              0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, '7', '8', '9', '-', '4',
                             '5', '6', '+', '1', '2', '3', '0', '.'};
 //translational table for caps case
 static char scancode_caps[] = {0, 0, '1', '2', '3', '4', '5', '6', '7', '8', '9', '0',
-                            '-', '=', 0, 0, 'Q', 'W', 'E', 'R', 'T', 'Y', 'U',
-                            'I', 'O', 'P', '[', ']', '\n', 0, 'A', 'S', 'D', 'F','G',
+                            '-', '=', 0x08, 0x09, 'Q', 'W', 'E', 'R', 'T', 'Y', 'U',
+                            'I', 'O', 'P', '[', ']', 0x0D, 0, 'A', 'S', 'D', 'F','G',
                             'H', 'J', 'K', 'L', ';', 0x27, 0x60, 0, 0x5c, 'Z', 'X', 'C',
                             'V', 'B', 'N', 'M', ',', '.', '/', 0, '*', 0, ' ', 0, 0,
                              0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, '7', '8', '9', '-', '4',
@@ -61,9 +61,9 @@ volatile char cmd_hist[TNUM][HISTNUM][BUFMAX];   //allows for cmd history up to 
 *   DESCRIPTION: enables irq1 to allow keyboard interrupts
 *     also sets up the global vars for keyboard use
 *   INPUTS: none
-*   OUTPUTS: none
+*   OUTPUTS: inserts default values to all of the global vars
 *   RETURN VALUE: none
-*   SIDE EFFECTS: clears screen
+*   SIDE EFFECTS: none
 */
 void keyboard_init(){
   //no protect needed, interrupt not enabled
@@ -104,15 +104,23 @@ void keyboard_init(){
   term = 0;
   //enable req and clear the screen
   enable_irq(1);
-  term_clear(term,0);
   return;
 }
 //update the current terminal
+//pulls this data from term init
 void update_term(unsigned int t){
   term = t;
 }
-//handles system terminal writes
-int32_t term_write(int32_t fd, const char * buf, int32_t nbytes){
+/*
+* term_write
+*   DESCRIPTION: handles system terminal writes, uses the provided
+*     convention of fd, buffer, and nbytes to print to the screen
+*   INPUTS: file descriptor int, pointer to data buffer, nbytes to write
+*   OUTPUTS: none
+*   RETURN VALUE: number of bytes written (can vary based on screen size)
+*   SIDE EFFECTS: clears the screen
+*/
+int32_t term_write(int32_t fd, const uint8_t * buf, int32_t nbytes){
   int bytecnt;
   unsigned int idx;
   idx = fetch_process();
@@ -121,15 +129,26 @@ int32_t term_write(int32_t fd, const char * buf, int32_t nbytes){
   cursoff[idx] = 0;
   term_clear(idx,0);
   //kill if excedes term buffer size
-  while(bytecnt < nbytes && bytecnt < BUFMAX){
+  while(bytecnt < nbytes && bytecnt < XMAX * YMAX){
     term_putc(idx,buf[bytecnt]);
+    cursorX[term]++;
     bytecnt++;
   }
+  cursoff[idx] = CURSOROFF;
   return bytecnt;
 }
 
 //handles system terminal reads, deletes typed cmd after use
-int32_t term_read(int32_t fd, char * buf, int32_t nbytes){
+/*
+* term_reaad
+*   DESCRIPTION: takes the values from the cmd_buf global in keyboard and
+*     copies this to the provided buffer based on amount of bytes to read
+*   INPUTS: file descriptor int, pointer to the buf to fill, nbytes to write
+*   OUTPUTS: none
+*   RETURN VALUE: returns the amount of bytes written
+*   SIDE EFFECTS: writes history if desired, clears screen
+*/
+int32_t term_read(int32_t fd, uint8_t * buf, int32_t nbytes){
   //start at the cmd
   unsigned int idx = fetch_process();
   int32_t i,j;
@@ -144,8 +163,6 @@ int32_t term_read(int32_t fd, char * buf, int32_t nbytes){
   if(USEHIST == 1){
     history_write();
   }
-  //clean up and read buffer
-  term_clear(term,0);
   c = cmd_buf[idx][0];
   i = 0;
   //pull if inside buffer and set values
@@ -154,6 +171,8 @@ int32_t term_read(int32_t fd, char * buf, int32_t nbytes){
     buf[i] = c;
     i++;
   }
+  //clean up and read buffer
+  term_clear(term,0);
   //clean up buffer
   for(j=0;j<BUFMAX;j++){
     cmd_buf[idx][j] = 0;
@@ -165,13 +184,16 @@ int32_t term_read(int32_t fd, char * buf, int32_t nbytes){
 }
 /*
 * keyboard_handler
-*   DESCRIPTION: putc a lowercase character or number to screen from keyboard
+*   DESCRIPTION: this function handles the keybaord interupts based on the PIC
+*     it gets the scan code, parses the input, and updates the screen and
+*     command buffer as neccesary
 *   INPUTS: none
-*   OUTPUTS: none
+*   OUTPUTS: outputs chars to the cmd buffer, the screen, and moves the cursor
+*     on the screen as desired based on the key pressed
 *   RETURN VALUE: none
-*   SIDE EFFECTS: echo's keypress to screen
+*   SIDE EFFECTS: can call basically all of the keybaord functions, so can
+*     initiate most terminal actions and display actions
 */
-//rewrite to improve speed
 void keyboard_handler(){
   uint8_t scan;           //scancode
   int i;                  //loop int
@@ -190,20 +212,12 @@ void keyboard_handler(){
       cursorX[term]++;
       move_cursor(term);
       break;
-    case 1:  //no char write, handled in cases
+    case 1:  //no new char write, handled in cases
       break;
     case 2:  //stop char encountered, handle
-      i=0;
-      cursorX[term] = cursoff[term];
-      while(i<cmd_len[term]){
-        term_putc(term,cmd_buf[term][i]);
-        cursorX[term]++;
-        i++;
-      }
-      move_cursor(term);
       break;
     case 3:  //debug case
-      term_putc(term,'Q');
+      putc('Q');
       break;
     default:
       break;
@@ -217,8 +231,14 @@ void keyboard_handler(){
   asm("leave");
   asm("iret");                     // interrupt return
 }
-
-//moves the cursor forward based on coords
+/*
+* move_cursor
+*   DESCRIPTION: moves the cursor forward based on coords globals
+*   INPUTS: terminal number to move the cursor on
+*   OUTPUTS: none
+*   RETURN VALUE: none
+*   SIDE EFFECTS: moves the cursor onn the display based on the formula to move it
+*/
 void move_cursor(unsigned int t){
   validate_cursor(t);
   uint16_t loc = cursorY[t] * XMAX;     //iterate the pos down rows
@@ -234,7 +254,15 @@ void move_cursor(unsigned int t){
   outb(writeH,CURSORHA);
   return;
 }
-//validates the cursor location vars
+/*
+* validate_cursor
+*   DESCRIPTION: validates the cursor location global vars. The x is iterated past
+*     the end in alot of cases, this fixes the coordinate scheme as needed
+*   INPUTS: terminal to operate on
+*   OUTPUTS: none
+*   RETURN VALUE: none
+*   SIDE EFFECTS: changes the values of the cursor globals
+*/
 void validate_cursor(uint8_t t){
   //fix 2d coordinate scheme
   while(cursorX[t] > XMAX){
@@ -253,6 +281,16 @@ void validate_cursor(uint8_t t){
   }
 }
 //ret 0 for char wrote, 1 for non char write input, 2 for stop input
+/*
+* parse_input
+*   DESCRIPTION: uses many helper functions to take a scancode and perform the
+*     neccesary operations on it. Will add the char to the buffer if it is desired
+*     also could update the special ops or chars
+*   INPUTS: scancode
+*   OUTPUTS: none
+*   RETURN VALUE: int; 0 for char wrote, 1 for non char write input, 2 for stop input
+*   SIDE EFFECTS: could write to buffer or update ops
+*/
 int parse_input(uint8_t scancode){
   int ret;
   char c;
@@ -276,13 +314,22 @@ int parse_input(uint8_t scancode){
     return ret;
   }
   ret = process_char(c);
-  if(ret == 1 || ret == 2){
+  if(ret == 1 || ret == 2 || ret == 3){
     //was a special char, handled
     return ret;
   }
   //needs to be written, insert to build buf
   return insert_char(c,cmd_len[term]);
 }
+/*
+* process_char
+*   DESCRIPTION: takes a char val and uses it to do any needed commands
+*     based on ops (ex: CTRL+L)
+*   INPUTS: char to process
+*   OUTPUTS: none
+*   RETURN VALUE: 0 for no combo found, 1 for action taken
+*   SIDE EFFECTS: can move the cursor or allow term read
+*/
 int process_char(char c){
   int i;
   switch(c)
@@ -290,15 +337,6 @@ int process_char(char c){
     case 13:  //enter
       termRead[term] = 'y';
       return 2;
-    case 127: //delete
-      if(cursorX[term] > cursoff[term]){
-        cursorX[term]--;
-        cmd_len[term]--;
-        cmd_buf[term][cmd_len[term]]=0;
-        term_putc(term,0);
-        move_cursor(term);
-      }
-      return 1;
     case 8: //backspace
       if(cursorX[term] > cursoff[term]){
         cursorX[term]--;
@@ -308,7 +346,7 @@ int process_char(char c){
         move_cursor(term);
       }
       return 1;
-    case 'l':  //CTRL + l
+    case 108:  //CTRL + l
       if(ops[1] == 'y'){
         term_clear(term,0);
         return 1;
@@ -326,7 +364,15 @@ int process_char(char c){
   //is a printable char
   return 0;
 }
-//inserts char to build buffer
+/*
+* insert_char
+*   DESCRIPTION: inserts char to build buffer. This can be done at any index
+*     with the buffer being adjusted accordingly
+*   INPUTS: character to insert, index to insert at
+*   OUTPUTS: none
+*   RETURN VALUE: returns 1 if no insert, 0 if inserted
+*   SIDE EFFECTS: will adjust the cmd_buf and the lenght of the cmd
+*/
 int insert_char(char c, int idx){
   char temp;
   int i;
@@ -339,22 +385,24 @@ int insert_char(char c, int idx){
   }
   //check for invalid insert idx
   if(idx > cmd_len[term]){
-    return 3;
+    return 1;
   }
   //insert if toggled on
   if(ops[4] == 'y'){
     cmd_buf[term][idx] = c;
-    return 0;
+    term_putc(term,idx);
+    return 1;
   }
   //apped char at end
   if(idx == cmd_len[term]){
-    cmd_buf[term][idx] = c;
+    cmd_buf[term][cmd_len[term]] = c;
     cmd_len[term]++;
     return 0;
   }
   //insert is inside buf, shift the content after up by 1
   i = cmd_len[term];
-  while(idx < i){
+  i++;
+  while(idx-cursoff[term] < i){
     temp = cmd_buf[term][i-1];
     cmd_buf[term][i] = temp;
     i--;
@@ -363,13 +411,24 @@ int insert_char(char c, int idx){
   cmd_len[term]++;
   return 0;
 }
-//handles media key presses
+/*
+* process_media
+*   DESCRIPTION: handles media key presses (num pad and arrows mainly)
+*   INPUTS: scancode of pressed key
+*   OUTPUTS: none
+*   RETURN VALUE: returns 1 if media key was handled, 0 if not
+*   SIDE EFFECTS: can move the cursor or clear the screen in some cases
+*/
 int process_media(uint8_t scancode){
+  int i;
   switch(scancode)
   {
     case 0x48:  //up arrow
       if(USEHIST == 1){
         history_fetch(term);
+        i=0;
+        term_clear(term,1);
+        move_cursor(term);
         return 2;
       }
       return 1;
@@ -389,8 +448,16 @@ int process_media(uint8_t scancode){
       return 0;
   }
 }
-//func to update the ops based on scancode
-//[ins,alt,caps,ctrl,shift]
+/*
+* update_ops
+*   DESCRIPTION: updates the op code array for pressed control keys
+*     things like shift, caps, ctrl...
+*     current srtucture : [ins,alt,caps,ctrl,shift]
+*   INPUTS: scancode of pressed key
+*   OUTPUTS: none
+*   RETURN VALUE: returns 1 if opkey used, 0 otherwise
+*   SIDE EFFECTS: changes the status of the ops array based on presses
+*/
 int update_ops(uint8_t scancode){
   switch(scancode)
   {
@@ -404,7 +471,11 @@ int update_ops(uint8_t scancode){
     case 0x1D: //ctrl
       ops[1] = 'y';
       return 1;
-    case 0x3A: //caps
+    case 0x3A: //caps (toggle)
+      if(ops[2] == 'y'){
+        ops[2] = 'n';
+        return 1;
+      }
       ops[2] = 'y';
       return 1;
     case 0x38: //alt
@@ -427,9 +498,6 @@ int update_ops(uint8_t scancode){
     case 0x9D: //ctrl
       ops[1] = 'n';
       return 1;
-    case 0xBA: //caps
-      ops[2] = 'n';
-      return 1;
     case 0xB9: //alt
       ops[3] = 'n';
       return 1;
@@ -437,8 +505,16 @@ int update_ops(uint8_t scancode){
       return 0;
   }
 }
-//picks correct char based on flags, will return in bottom bits with flags
-//returns 0 if no char is needed based on flags
+/*
+* generate_char
+*   DESCRIPTION: picks correct char based on flags, will
+*     return in bottom bits with flags.
+*   INPUTS: scancode of pressed key
+*   OUTPUTS: none
+*   RETURN VALUE: char that is generated from the arrays based on scancode,
+*     otherwise 0 for no char generated (flags affect generation)
+*   SIDE EFFECTS: none
+*/
 char generate_char(uint8_t scancode){
   char c;
   unsigned int full;
@@ -465,6 +541,7 @@ char generate_char(uint8_t scancode){
       c = scancode_upper[scancode];
       return c;
     case 2:       //ctrl only
+      c = scancode_lower[scancode];
       return c;
     case 3:       //shift and ctrl
       return c;
@@ -475,10 +552,12 @@ char generate_char(uint8_t scancode){
       c = scancode_upper[scancode];
       return c;
     case 6:       //caps and ctrl
+      c = scancode_caps[scancode];
       return c;
     case 7:       //caps, ctrl, shift
       return c;
     case 8:       //alt only
+      c = scancode_lower[scancode];
       return c;
     case 9:       //alt and shift
       return c;
@@ -498,7 +577,14 @@ char generate_char(uint8_t scancode){
       return c;
   }
 }
-//change over current term buffer to history and displays
+/*
+* history_fetch
+*   DESCRIPTION: change over current term buffer to history and displays
+*   INPUTS: idx of the buffer to fetch from
+*   OUTPUTS: none
+*   RETURN VALUE: none
+*   SIDE EFFECTS: swaps in the buffered command from history
+*/
 void history_fetch(int idx){
   if(USEHIST == 0){
     //do nothing
@@ -516,7 +602,14 @@ void history_fetch(int idx){
   }
   cmd_len[term] = size;
 }
-//write the entered command to history
+/*
+* history_write
+*   DESCRIPTION: write the entered command to history buffer array
+*   INPUTS: none
+*   OUTPUTS: none
+*   RETURN VALUE: none
+*   SIDE EFFECTS: updates the history buffer array for later used if desired
+*/
 void history_write(){
   int i,j;
   if(USEHIST == 0){
@@ -540,6 +633,7 @@ void history_write(){
   return;
 }
 //function to get the process id in order to do sys calls
+//this returns 0 for now but will be useful for multi terms
 unsigned int fetch_process(){
   unsigned int id;
 
@@ -550,7 +644,17 @@ unsigned int fetch_process(){
   //return the term for now
   return id;
 }
-//puts char at loc based on given cursor loc
+//
+/*
+* term_putc
+*   DESCRIPTION: puts char at loc based on given cursor loc. works much
+*     like the given putc, but has more flexible addressign and indexing
+*     based on the cursor loc and write addresses
+*   INPUTS: term number, char
+*   OUTPUTS: none
+*   RETURN VALUE: none
+*   SIDE EFFECTS: will add a char in the idex of the memory location desired
+*/
 void term_putc(unsigned int t, uint8_t c){
   //do same as putc
   if(USEPAGE == 0){
@@ -564,7 +668,16 @@ void term_putc(unsigned int t, uint8_t c){
   *(uint8_t *)(address[t] + ((XMAX * cursorY[t] + cursorX[t]) << 1) + 1) = attr[t];
   return;
 }
-//clear and reset the terminal for use
+/*
+* term_clear
+*   DESCRIPTION: clear and reset the terminal for other uses. can either write
+*     just the prompt or write the whole buffer back to screen based on op
+*   INPUTS: term number, operation condidions to perform
+*   OUTPUTS: none
+*   RETURN VALUE: none
+*   SIDE EFFECTS: will clear the screen or the screen memory of the address chosen
+*     can also write to this memory after clear
+*/
 void term_clear(unsigned int t, int op){
   int cnt, i;
 

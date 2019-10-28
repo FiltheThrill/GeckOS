@@ -19,7 +19,7 @@
 #define OPNUM       0x05        //amount of ops to watch
 //controls
 #define USEPAGE     0x00        //binary on off for paging with the shell
-#define USEHIST     0x01        //binary on/off for history feature
+#define USEHIST     0x00        //binary on/off for history feature
 #define USECMD      0x01        //binary on/off for extra keyboard commands
 
 //externals
@@ -28,8 +28,8 @@ extern void update_term(unsigned int term);
 extern void keyboard_handler();
 extern void move_cursor(unsigned int t);
 extern unsigned int fetch_process();
-extern int32_t term_write(int32_t fd, const char * buf, int32_t nbytes);
-extern int32_t term_read(int32_t fd, char * buf, int32_t nbytes);
+extern int32_t term_write(int32_t fd, const uint8_t * buf, int32_t nbytes);
+extern int32_t term_read(int32_t fd, uint8_t * buf, int32_t nbytes);
 extern void term_clear(unsigned int t, int op);
 extern void term_putc(unsigned int t, uint8_t c);
 //internals

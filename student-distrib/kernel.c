@@ -10,6 +10,7 @@
 #include "tests.h"
 #include "IDT.h"
 #include "keyboard.h"
+#include "terminal.h"
 #include "rtc.h"
 #include "paging.h"
 #include "files.h"
@@ -144,15 +145,17 @@ void entry(unsigned long magic, unsigned long addr) {
     idt_init();
     /* Init the PIC */
     i8259_init();
+    /* Init paging */
+	  paging_init();
+    clear();
+    /* Init the terminal */
+    term_init();
     /* Init the keyboard */
-    open_keyboard_irq();
-	/* Init the RTC */
-	rtc_init();
-	/* Init paging */
-	paging_init();
-  clear();
-  /* init files */
-  files_init(boot);
+    keyboard_init();
+	   /* Init the RTC */
+	  rtc_init();
+    /* init files */
+    files_init(boot);
     /* Initialize devices, memory, filesystem, enable device interrupts on the
      * PIC, any other initialization stuff... */
 

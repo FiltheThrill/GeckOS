@@ -10,6 +10,15 @@ volatile uint8_t termmem[TNUM];           //vid mem pointers
 volatile int termpid[TNUM];               //process id given to the terminal
 volatile char termrun[TNUM];              //check if term is active
 
+/*
+* term_init
+*   DESCRIPTION: This function fills the terminal global vars with default values
+*     to initialize them
+*   INPUTS: none
+*   OUTPUTS: none
+*   RETURN VALUE: none
+*   SIDE EFFECTS: fills the globals with default vals
+*/
 void term_init(){
   int i;
   uint32_t v,p;  //variables for paging setup
@@ -29,7 +38,15 @@ void term_init(){
   }
   return;
 }
-
+/*
+* term_start
+*   DESCRIPTION: turns on a terminal or makes it the active one based on the
+*     desired termional
+*   INPUTS: num - number of the terminal to opreate on
+*   OUTPUTS: none
+*   RETURN VALUE: returns 0 if already running, 1 if fresh start
+*   SIDE EFFECTS: starts a new operational terminal
+*/
 int term_start(unsigned int num){
   //protect memory
   cli();
@@ -50,7 +67,16 @@ int term_start(unsigned int num){
   sti();
   return 1;
 }
-
+/*
+* term_swap
+*   DESCRIPTION: moves between the active terminals and updates the screen
+*     memory with the desired terminal memory
+*   INPUTS: term - term number to swap to
+*   OUTPUTS: none
+*   RETURN VALUE: none
+*   SIDE EFFECTS: will change the active terminal and clear the screen, also
+*     updates the address to write to
+*/
 void term_swap(unsigned int term){
   //update values in both instances
   curterm = term;
