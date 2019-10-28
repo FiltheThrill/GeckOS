@@ -7,6 +7,8 @@ https://courses.engr.illinois.edu/ece391/fa2019/secure/references/ds12887.pdf
 #include "lib.h"
 #include "i8259.h"
 
+volatile int rtc_interrupt_flag;
+
 /*
 * rtc_init
 *   DESCRIPTION: enables irq8 to allow rtc interrupts
@@ -22,14 +24,9 @@ void rtc_init()
 	char prev = inb(CMOS_PORT); //read value in reg B
 	outb(REG_B_NMI, RTC_PORT); //set RTC to reg B NMI
 	outb(prev | PIE_EN, CMOS_PORT); // Turn on Periodic Interrupt Enable bit
+	sti(); // enable interrupts
 	
-	
-	//set f = 2Hz
-	outb(REG_A_NMI, RTC_PORT);
-	prev = inb(CMOS_PORT);
-	outb (REG_A_NMI, RTC_PORT);
-	outb (((prev & 0xF0) | 0x0F), CMOS_PORT);
-	sti();
+	rtc_open();
 	
 	outb(REG_C, RTC_PORT); // allow interrupts to occur again
 	inb(CMOS_PORT);
@@ -54,6 +51,7 @@ void RTC_handler()
 	:
 	:);
 	//test_interrupts(); // Call test_interrupts
+	rtc_interrupt_flag = 0;
 	
 	outb (REG_C, RTC_PORT); // Allow more interrupts to occur
 	inb(CMOS_PORT);
@@ -70,14 +68,15 @@ void RTC_handler()
 
 int32_t rtc_read(int32_t fd, void* buf, int32_t nbytes)
 {
-	
+	rtc_interrupt_flag = 1;
+	while (rtc_interrupt_flag);
 	
 	return RTC_SUCCESS;
 }
 
 int32_t rtc_write(int32_t fd, void* buf, int32_t nbytes)
 {	
-	char rate;
+	char rate = 0x00;
 	
 	switch(nbytes)
 	{
@@ -133,10 +132,12 @@ int32_t rtc_open(const uint8_t* filename)
 	//set f = 2Hz
 	cli();
 	outb(REG_A_NMI, RTC_PORT);
-	prev = inb(CMOS_PORT);
+	char prev = inb(CMOS_PORT);
 	outb (REG_A_NMI, RTC_PORT);
 	outb (((prev & 0xF0) | 0x0F), CMOS_PORT);
 	sti();
+	
+	return RTC_SUCCESS;
 }
 
 int32_t rtc_close(int32_t fd)

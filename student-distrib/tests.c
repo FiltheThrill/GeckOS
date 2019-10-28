@@ -11,7 +11,8 @@
 #define DIVTEST 0
 #define PAGETEST 0
 #define DEREFTEST 0
-#define VALIDPAGETEST 1
+#define VALIDPAGETEST 0
+#define RTCTEST 1
 
 /* format these macros as you see fit */
 #define TEST_HEADER 	\
@@ -128,6 +129,102 @@ int deref_null_test()
 }
 
 /* Checkpoint 2 tests */
+
+int rtc_tests()
+{
+	TEST_HEADER;
+	int result = PASS;
+	
+	const uint8_t* fname = (const uint8_t*)"";
+	int32_t check_open, check_close, check_read, check_write;
+	check_open = rtc_open(fname);
+	if (check_open == -1)
+	{
+		printf("unable to open rtc");
+		result = FAIL;
+	}
+	
+	uint8_t buf[1];
+	int bytes;
+
+	for (int i = 0; i < 20; i++)
+	{
+		check_read = rtc_read(0, buf, bytes);
+		printf("1");
+	}
+	
+	check_write = rtc_write(0, buf, 4);
+	for (i = 0, i < 20; i++)
+	{
+		check_read = rtc_read(0, buf, bytes);
+		printf("1");
+	}
+	
+	check_write = rtc_write(0, buf, 8);
+	for (i = 0, i < 20; i++)
+	{
+		check_read = rtc_read(0, buf, bytes);
+		printf("1");
+	}
+	
+	check_write = rtc_write(0, buf, 16);
+	for (i = 0, i < 20; i++)
+	{
+		check_read = rtc_read(0, buf, bytes);
+		printf("1");
+	}
+	
+	check_write = rtc_write(0, buf, 32);
+	for (i = 0, i < 20; i++)
+	{
+		check_read = rtc_read(0, buf, bytes);
+		printf("1");
+	}
+	
+	check_write = rtc_write(0, buf, 64);
+	for (i = 0, i < 20; i++)
+	{
+		check_read = rtc_read(0, buf, bytes);
+		printf("1");
+	}
+	
+	check_write = rtc_write(0, buf, 128);
+	for (i = 0, i < 20; i++)
+	{
+		check_read = rtc_read(0, buf, bytes);
+		printf("1");
+	}
+	
+	check_write = rtc_write(0, buf, 256);
+	for (i = 0, i < 20; i++)
+	{
+		check_read = rtc_read(0, buf, bytes);
+		printf("1");
+	}
+	
+	check_write = rtc_write(0, buf, 512);
+	for (i = 0, i < 20; i++)
+	{
+		check_read = rtc_read(0, buf, bytes);
+		printf("1");
+	}
+	
+	check_write = rtc_write(0, buf, 1024);
+	for (i = 0, i < 20; i++)
+	{
+		check_read = rtc_read(0, buf, bytes);
+		printf("1");
+	}
+
+	check_close = rtc_close(check_open);
+	if (check_close == -1)
+	{
+		printf("unable to close rtc");
+		result = FAIL;
+	}
+	
+	return result;
+}
 /* Checkpoint 3 tests */
 /* Checkpoint 4 tests */
 /* Checkpoint 5 tests */
@@ -148,5 +245,8 @@ void launch_tests(){
 	#endif
 	#if (DEREFTEST == 1)
 		TEST_OUTPUT("Dereference NULL test", deref_null_test());
+	#endif
+	#if (RTCTEST == 1)
+		rtc_tests();
 	#endif
 }
