@@ -151,10 +151,8 @@ void entry(unsigned long magic, unsigned long addr) {
 	/* Init paging */
 	paging_init();
   clear();
-  //printf("trying to initialize\n");
-  //printf("%d \n", boot);
+  /* init files */
   files_init(boot);
-//  printf("files initialized\n");
     /* Initialize devices, memory, filesystem, enable device interrupts on the
      * PIC, any other initialization stuff... */
 

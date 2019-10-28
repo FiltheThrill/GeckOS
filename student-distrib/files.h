@@ -48,7 +48,7 @@ extern int32_t fwrite(const uint8_t* fname);
 extern int32_t dopen(const uint8_t* fname);
 extern int32_t dclose();
 extern int32_t dwrite();
-extern int32_t dread(void* buf);
+extern int32_t dread(void* buf, uint32_t d_index);
 extern int32_t fread(void* buf, uint32_t offset, uint32_t length);
 
 #endif

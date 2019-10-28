@@ -14,8 +14,12 @@
 #define PAGETEST 0
 #define DEREFTEST 0
 #define VALIDPAGETEST 0
-#define READFRAME1 1
-
+#define READFRAME1 0
+#define READFRAME0 0
+#define READLARGE 1
+#define READCAT   0
+#define READTEST  0
+#define READDIR 0
 /* format these macros as you see fit */
 #define TEST_HEADER 	\
 	printf("[TEST %s] Running %s at %s:%d\n", __FUNCTION__, __FUNCTION__, __FILE__, __LINE__)
@@ -131,14 +135,104 @@ int deref_null_test()
 }
 
 /* Checkpoint 2 tests */
+
+/* read frame 1 Test
+ *
+ * prints frame1.txt to screen
+ * Inputs: None
+ * Outputs: none
+ * Side Effects: None
+ * Coverage:reading txt files
+ * Files: files.c/h
+ */
 void read_frame1()
 {
-	//TEST_HEADER;
 	int result = PASS;
-	printf("starting frame1 read \n");
 	const uint8_t* fname = (const uint8_t*)"frame1.txt";
 	int32_t check;
-	uint8_t buf[200];
+	uint8_t buf[185];
+	int bytes;
+	check = fopen(fname);
+	if(check == -1)
+	{
+		printf("unable to open file");
+		result = FAIL;
+	}
+	bytes = fread(buf, 0, 185);
+	puts((int8_t*)buf);
+	fclose(fname);
+}
+
+/* read frame 0 Test
+ *
+ * prints frame0.txt to screen
+ * Inputs: None
+ * Outputs: none
+ * Side Effects: None
+ * Coverage:reading txt files
+ * Files: files.c/h
+ */
+void read_frame0()
+{
+	int result = PASS;
+	const uint8_t* fname = (const uint8_t*)"frame0.txt";
+	int32_t check;
+	uint8_t buf[198];
+	int bytes;
+	check = fopen(fname);
+	if(check == -1)
+	{
+		printf("unable to open file");
+		result = FAIL;
+	}
+	bytes = fread(buf, 0, 198);
+	puts((int8_t*)buf);
+	fclose(fname);
+
+}
+
+/* read very large Test
+ *
+ * prints verylargetextwithverylongname.txt to screen
+ * Inputs: None
+ * Outputs: none
+ * Side Effects: None
+ * Coverage:reading large txt files
+ * Files: files.c/h
+ */
+void read_large()
+{
+	int result = PASS;
+	const uint8_t* fname = (const uint8_t*)"verylargetextwithverylongname.txt";
+	int32_t check;
+	uint8_t buf[5305];
+	int bytes;
+	check = fopen(fname);
+	if(check == -1)
+	{
+		printf("unable to open file");
+		result = FAIL;
+	}
+	bytes = fread(buf, 0, 5305);
+	puts((int8_t*)buf);
+	fclose(fname);
+}
+
+/* read cat Test
+ *
+ * prints cat to screen
+ * Inputs: None
+ * Outputs: none
+ * Side Effects: None
+ * Coverage:reading non txt files
+ * Files: files.c/h
+ */
+void read_cat()
+{
+	int result = PASS;
+	const uint8_t* fname = (const uint8_t*)"cat";
+	int32_t check;
+	uint8_t buf[445];
 	int bytes;
 	int i;
 	check = fopen(fname);
@@ -147,11 +241,81 @@ void read_frame1()
 		printf("unable to open file");
 		result = FAIL;
 	}
-//	printf("Reading...\n");
-	bytes = fread(buf, 0, 200);
-	//printf("Read!\n");
-	puts(buf);
-//	return result;
+
+	bytes = fread(buf, 5000, 445);
+	for(i = 0; i < bytes; i++)
+	{
+		putc(buf[i]);
+	}
+	fclose(fname);
+}
+
+/* read testprint Test
+ *
+ * prints testprint to screen
+ * Inputs: None
+ * Outputs: none
+ * Side Effects: None
+ * Coverage:reading non txt files
+ * Files: files.c/h
+ */
+void read_test()
+{
+	int result = PASS;
+	const uint8_t* fname = (const uint8_t*)"testprint";
+	int32_t check;
+	uint8_t buf[445];
+	int bytes;
+	int i;
+	check = fopen(fname);
+	if(check == -1)
+	{
+		printf("unable to open file");
+		result = FAIL;
+	}
+
+	bytes = fread(buf, 4800, 445);
+	for(i = 0; i < bytes; i++)
+	{
+		putc(buf[i]);
+	}
+	fclose(fname);
+}
+
+/* read directory Test
+ *
+ * prints directory contents to screen
+ * Inputs: None
+ * Outputs: none
+ * Side Effects: None
+ * Coverage:reading directory
+ * Files: files.c/h
+ */
+void read_dir()
+{
+	int result = PASS;
+	const uint8_t* fname = (const uint8_t*)".";
+	int32_t check;
+	uint8_t buf[32];
+	int bytes;
+	int i, j;
+	check = dopen(fname);
+	if(check == -1)
+	{
+		printf("unable to open directory");
+		result = FAIL;
+	}
+	for(i = 1; i < 17; i++)
+	{
+		bytes = dread(buf, i);
+		for(j = 0; j < bytes; j++)
+		{
+			putc(buf[j]);
+
+		}
+		putc('\n');
+	}
+	dclose(fname);
 }
 /* Checkpoint 3 tests */
 /* Checkpoint 4 tests */
@@ -176,5 +340,20 @@ void launch_tests(){
 	#endif
 	#if (READFRAME1 == 1)
 			read_frame1();
+	#endif
+	#if (READFRAME0 == 1)
+			read_frame0();
+	#endif
+	#if (READLARGE == 1)
+			read_large();
+	#endif
+	#if (READCAT == 1)
+			read_cat();
+	#endif
+	#if (READTEST == 1)
+			read_test();
+	#endif
+	#if (READDIR == 1)
+			read_dir();
 	#endif
 }
