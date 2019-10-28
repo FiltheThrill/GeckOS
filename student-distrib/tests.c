@@ -13,7 +13,7 @@
 #define PAGETEST 0
 #define DEREFTEST 0
 #define VALIDPAGETEST 0
-#define RTCTEST 1
+#define RTCTEST 0
 
 /* format these macros as you see fit */
 #define TEST_HEADER 	\
@@ -131,13 +131,24 @@ int deref_null_test()
 
 /* Checkpoint 2 tests */
 
+/*
+* rtc_tests
+ * Asserts that the rtc frequency can be changed
+ * Inputs: None
+ * Outputs: PASS
+ * Side Effects: None
+ * Coverage: rtc_read/write/open/close
+ * Files: rtc.c/h
+ */
 int rtc_tests()
 {
 	TEST_HEADER;
 	int result = PASS;
 	int i;
 	
+	// random values not used
 	const uint8_t* fname = (const uint8_t*)"";
+	// check if we are successfull in all our operations
 	int32_t check_open, check_close, check_read, check_write;
 	check_open = rtc_open(fname);
 	if (check_open == -1)
@@ -146,11 +157,15 @@ int rtc_tests()
 		result = FAIL;
 	}
 	
+	// more garbage vars
 	uint8_t buf[1];
 	int bytes;
 
+	// clear the screen for the test
 	clear();
 
+	// since we opened the rtc the freq = 2Hz
+	// test this by printing 15 ones when the next interrupt occurs (rtc_read returns)
 	for (i = 0; i < 15; i++)
 	{
 		check_read = rtc_read(0, buf, bytes);
@@ -158,6 +173,7 @@ int rtc_tests()
 	}
 	printf("\n");
 	
+	//test 4 Hz
 	check_write = rtc_write(0, buf, 4);
 	for (i = 0; i < 15; i++)
 	{
@@ -167,6 +183,7 @@ int rtc_tests()
 	
 	printf("\n");
 	
+	//test 8 Hz, then 16, then 32, then 64, then ... 1024
 	check_write = rtc_write(0, buf, 8);
 	for (i = 0; i < 15; i++)
 	{
@@ -239,6 +256,7 @@ int rtc_tests()
 	
 	printf("\n");
 
+	// close the rtc (do nothing)
 	check_close = rtc_close(check_open);
 	if (check_close == -1)
 	{
@@ -246,6 +264,7 @@ int rtc_tests()
 		result = FAIL;
 	}
 	
+	// return PASS!
 	return result;
 }
 /* Checkpoint 3 tests */
@@ -270,6 +289,6 @@ void launch_tests(){
 		TEST_OUTPUT("Dereference NULL test", deref_null_test());
 	#endif
 	#if (RTCTEST == 1)
-		rtc_tests();
+		TEST_OUTPUT("Test our RTC", rtc_tests());
 	#endif
 }
