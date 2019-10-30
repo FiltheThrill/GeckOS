@@ -8,6 +8,7 @@ https://wiki.osdev.org/Exceptions
 #include "lib.h"
 #include "keyboard.h"
 #include "rtc.h"
+#include "fistdemcallswrapper.h"
 //ecxeption handling for giant switch case
 void div_by_0(){exceptions(0);}
 void debug(){exceptions(1);}
@@ -300,7 +301,7 @@ void exceptions(int exception_num)
         }
 
     }
-    //SET_IDT_ENTRY(idt[SYS_CALL_VECT], somehandler); //not sure if needed right now
+    SET_IDT_ENTRY(idt[SYS_CALL_VECT], syscall_handler); //not sure if needed right now
     //SET_IDT_ENTRY(idt[timerchip], pithandler); //not sure if needed right now
     //SET_IDT_ENTRY(idt[0x2C], mouse_handler);
     SET_IDT_ENTRY(idt[KEYBOARD_IRQ], keyboard_handler);

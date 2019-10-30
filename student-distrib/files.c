@@ -11,7 +11,7 @@ diagram in appendix A in mp3 documentation is hella clutch as well*/
 boot_block_t* boot_block;
 inode_t* inode_addr;
 dentry_t global_dentry;
-
+int d_index
 /*
  * files_init
  *   DESCRIPTION: assignes start address for the boot block and start address for inodes
@@ -193,7 +193,7 @@ int32_t fopen(const uint8_t* fname)
  *   RETURN VALUE: 0 for success -1 for failure
  *   SIDE EFFECTS: none
  */
-int32_t fclose(const uint8_t* fname)
+int32_t fclose(int32_t fd)
 {
   return SUCCESS;
 }
@@ -221,10 +221,10 @@ int32_t fwrite(const uint8_t* fname)
  *   RETURN VALUE: the number of bytes read
  *   SIDE EFFECTS: none
  */
-int32_t fread(void* buf, uint32_t offset, uint32_t length)
+int32_t fread(int32_t fd, void* buf, int32_t nbytes)
 {
   int32_t bytes_read;
-  bytes_read = read_data(global_dentry.inode_num, offset, buf, length);
+  bytes_read = read_data(global_dentry.inode_num, 0, buf, nbytes);
   return bytes_read;
 }
 
@@ -263,12 +263,12 @@ int32_t dopen(const uint8_t* fname)
  *   RETURN VALUE: 0 for success -1 for failure
  *   SIDE EFFECTS: none
  */
-int32_t dclose()
+int32_t dclose(int32_t fd)
 {
   return SUCCESS;
 }
 
-int32_t dwrite()
+int32_t dwrite((int32_t fd, const void* buf, int32_t nbytes)
 {
   return FAILURE;
 }
@@ -282,7 +282,7 @@ int32_t dwrite()
  *   RETURN VALUE: the number of bytes read
  *   SIDE EFFECTS: none
  */
-int32_t dread(void* buf, uint32_t d_index)
+int32_t dread(int32_t fd, void* buf, int32_t nbytes)
 {
   int i;
   int32_t check;
@@ -312,6 +312,6 @@ int32_t dread(void* buf, uint32_t d_index)
     ((uint8_t*)buf)[i] = global_dentry.file_name[i];
     bytes_read++;
   }
-
+  d_index++;
   return bytes_read;
 }
