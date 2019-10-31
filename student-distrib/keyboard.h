@@ -32,6 +32,7 @@
 #define UPARW       0x48
 #define LEFTARW     0x4B
 #define RIGHTARW    0x4D
+#define DOWNARW     0x50
 #define RSHIFT      0x36
 #define LSHIFT      0x2A
 #define CTRL        0x1D
@@ -46,21 +47,23 @@
 extern void keyboard_init();
 extern void update_term(unsigned int term);
 extern void keyboard_handler();
-extern int move_cursor(unsigned int t);
-extern unsigned int fetch_process();
 extern int32_t term_write(int32_t fd, const uint8_t * buf, int32_t nbytes);
 extern int32_t term_read(int32_t fd, uint8_t * buf, int32_t nbytes);
 extern void term_clear(unsigned int t, int op);
 extern void term_putc(unsigned int t, uint8_t c);
 //internals
+void move_cursor(unsigned int t);
+unsigned int fetch_process();
+void fill_cmdbuf();
 int process_char(char c);
 int process_media(uint8_t scancode);
-uint16_t parse_input(uint8_t scancode);
+int parse_input(uint8_t scancode);
 int update_ops(uint8_t scancode);
 char generate_char(uint8_t scancode);
 int insert_char(char c, int idx);
 int remove_char(int idx);
 int validate_cursor(uint8_t t);
+int reprint_screen();
 //extras
 void history_fetch(int idx);
 void history_write();
