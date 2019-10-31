@@ -38,9 +38,9 @@ typedef struct inode_t {
 } inode_t;
 
 
-int32_t read_dentry_by_name(const uint8_t* fname, dentry_t* dentry);
-int32_t read_dentry_by_index(uint32_t index, dentry_t* dentry);
-int32_t read_data(uint32_t inode, uint32_t offset, uint8_t* buf, uint32_t length);
+extern int32_t read_dentry_by_name(const uint8_t* fname, dentry_t* dentry);
+extern int32_t read_dentry_by_index(uint32_t index, dentry_t* dentry);
+extern int32_t read_data(uint32_t inode, uint32_t offset, uint8_t* buf, uint32_t length);
 extern void files_init(int32_t start);
 extern int32_t fopen(const uint8_t* fname);
 extern int32_t fclose(const uint8_t* fname);
