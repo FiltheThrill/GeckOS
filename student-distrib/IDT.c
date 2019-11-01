@@ -8,7 +8,7 @@ https://wiki.osdev.org/Exceptions
 #include "lib.h"
 #include "keyboard.h"
 #include "rtc.h"
-#include "fistdemcallswrapper.h"
+#include "syscall_wrapper.h"
 //ecxeption handling for giant switch case
 void div_by_0(){exceptions(0);}
 void debug(){exceptions(1);}

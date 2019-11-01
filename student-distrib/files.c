@@ -9,9 +9,8 @@ diagram in appendix A in mp3 documentation is hella clutch as well*/
 #include "lib.h"
 
 boot_block_t* boot_block;
-inode_t* inode_addr;
 dentry_t global_dentry;
-int d_index
+int d_index = 0;
 /*
  * files_init
  *   DESCRIPTION: assignes start address for the boot block and start address for inodes
@@ -93,9 +92,9 @@ int32_t read_data(uint32_t inode, uint32_t offset, uint8_t* buf, uint32_t length
 {
   int32_t cpy_length, inode_len, inode_num, offset_blocks, offset_bytes, data_idx;
   int bytes_read = 0;
-  int i = 0;
   uint8_t* buf_addr;
   uint8_t* data_blocks;
+  int i= 0;
   inode_num =  boot_block->num_inodes;
 
   if((inode < 0) || (inode >= inode_num))  // check if inode is in bounds
@@ -111,6 +110,7 @@ int32_t read_data(uint32_t inode, uint32_t offset, uint8_t* buf, uint32_t length
 //    printf("no information in this inode\n");
     return FAILURE;
   }
+
   if(offset >= inode_len){    //return 0 bytes read if offset it too large
     return bytes_read;
   }
@@ -141,8 +141,8 @@ int32_t read_data(uint32_t inode, uint32_t offset, uint8_t* buf, uint32_t length
       buf[i] = *buf_addr;
 
       //increment and decrement values accordingly
-      bytes_read++;
       i++;
+      bytes_read++;
       cpy_length--;
 
       //needed or else it will page fault
@@ -155,6 +155,7 @@ int32_t read_data(uint32_t inode, uint32_t offset, uint8_t* buf, uint32_t length
     offset_blocks++;
     offset_bytes = 0;
   }
+
   return bytes_read;  //shouldnt get here but just in case
 }
 
@@ -206,7 +207,7 @@ int32_t fclose(int32_t fd)
  *   RETURN VALUE: 0 for success -1 for failure
  *   SIDE EFFECTS: none
  */
-int32_t fwrite(const uint8_t* fname)
+int32_t fwrite(int32_t fd, const void* buf, int32_t nbytes)
 {
   return FAILURE;
 }
@@ -268,7 +269,7 @@ int32_t dclose(int32_t fd)
   return SUCCESS;
 }
 
-int32_t dwrite((int32_t fd, const void* buf, int32_t nbytes)
+int32_t dwrite(int32_t fd, const void* buf, int32_t nbytes)
 {
   return FAILURE;
 }

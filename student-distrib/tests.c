@@ -26,6 +26,7 @@
 #define RTCTEST 0
 #define KEYTEST 0
 #define TERMTEST 1
+#define COMMENTFILETEST 0
 /* format these macros as you see fit */
 #define TEST_HEADER 	\
 	printf("[TEST %s] Running %s at %s:%d\n", __FUNCTION__, __FUNCTION__, __FILE__, __LINE__)
@@ -141,6 +142,7 @@ int deref_null_test()
 }
 
 /* Checkpoint 2 tests */
+#if (COMMENTFILETEST == 1)
 
 /* read frame 1 Test
  *
@@ -326,6 +328,7 @@ void read_dir()
 	}
 	dclose(fname);
 }
+#endif
 
 /*
 * rtc_tests

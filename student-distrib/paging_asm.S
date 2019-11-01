@@ -2,6 +2,7 @@
 #include "paging_asm.h"
 
 .global paging_en
+.global flush_tlb_asm
 
 # paging_en:
 # Puts the page directory into the PDBR which is stored in cr3
@@ -9,7 +10,7 @@
 paging_en:
 	pushl %ebp
 	movl %esp, %ebp
-	
+
 	# Save eax which is clobbered
 	pushl %eax
 	# Move the page directory into cr3
@@ -24,6 +25,13 @@ paging_en:
     orl $PAGING_EN, %eax
     movl %eax, %cr0
 	popl %eax
-	
+
 	leave
 	ret
+
+flush_tlb_asm:
+
+		movl %cr0, %eax
+		movl %eax, %cr0
+
+		ret

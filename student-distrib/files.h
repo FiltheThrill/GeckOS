@@ -32,10 +32,13 @@ typedef struct boot_block_t {
   dentry_t dir_entries[FILESMAX];      //both statistics and each directory occupy 64B
                                      //so the system can hold 63 files
 } boot_block_t;
+
 typedef struct inode_t {
   int32_t length_in_B;
   int32_t data_block_idx[FILL4KB];
 } inode_t;
+
+inode_t* inode_addr;
 
 
 extern int32_t read_dentry_by_name(const uint8_t* fname, dentry_t* dentry);
@@ -43,12 +46,11 @@ extern int32_t read_dentry_by_index(uint32_t index, dentry_t* dentry);
 extern int32_t read_data(uint32_t inode, uint32_t offset, uint8_t* buf, uint32_t length);
 extern void files_init(int32_t start);
 extern int32_t fopen(const uint8_t* fname);
-extern int32_t fclose(const uint8_t* fname);
-extern int32_t fwrite(const uint8_t* fname);
+extern int32_t fclose(int32_t fd);
+extern int32_t fwrite(int32_t fd, const void* buf, int32_t nbytes);
 extern int32_t dopen(const uint8_t* fname);
-extern int32_t dclose();
-extern int32_t dwrite();
-extern int32_t dread(void* buf, uint32_t d_index);
-extern int32_t fread(void* buf, uint32_t offset, uint32_t length);
-
+extern int32_t dclose(int32_t fd);
+extern int32_t dwrite(int32_t fd, const void* buf, int32_t nbytes);
+extern int32_t dread(int32_t fd, void* buf, int32_t nbytes);
+extern int32_t fread(int32_t fd, void* buf, int32_t nbytes);
 #endif
