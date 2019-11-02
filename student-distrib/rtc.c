@@ -25,16 +25,16 @@ void rtc_init()
 	outb(REG_B_NMI, RTC_PORT); //set RTC to reg B NMI
 	outb(prev | PIE_EN, CMOS_PORT); // Turn on Periodic Interrupt Enable bit
 	sti(); // enable interrupts
-	
+
 	const uint8_t* fname = (const uint8_t*)"";
 	int32_t open = rtc_open(fname);
 	open++;
-	
+
 	outb(REG_C, RTC_PORT); // allow interrupts to occur again
 	inb(CMOS_PORT);
-	
+
 	enable_irq(8);
-	
+
 }
 
 /*
@@ -54,10 +54,10 @@ void RTC_handler()
 	:);
 	//test_interrupts(); // Call test_interrupts
 	rtc_interrupt_flag = 0;
-	
+
 	outb (REG_C, RTC_PORT); // Allow more interrupts to occur
 	inb(CMOS_PORT);
-	
+
 	sti(); //enable interrupts
 	send_eoi(8); //send end of interrupt on irq8
 	asm volatile(
@@ -83,7 +83,7 @@ int32_t rtc_read(int32_t fd, void* buf, int32_t nbytes)
 	// loops and does nothing waiting for next interrupt to occur
 	rtc_interrupt_flag = 1;
 	while (rtc_interrupt_flag);
-	
+
 	return RTC_SUCCESS;
 }
 
@@ -97,11 +97,11 @@ int32_t rtc_read(int32_t fd, void* buf, int32_t nbytes)
 *				  -1 when a bad input is given (not power of 2 or inbetween 0 and 1024)
 *   SIDE EFFECTS: changes the frequency of the rtc
 */
-int32_t rtc_write(int32_t fd, void* buf, int32_t nbytes)
-{	
+int32_t rtc_write(int32_t fd, const void* buf, int32_t nbytes)
+{
 	// initialize the rate to 0 Hz
 	char rate = HZ_0;
-	
+
 	// use the value of nbytes to determine the frequency of our rtc
 	// if nbytes is not between 0 and 1024 or divisible by 2 return -1 for failure
 	switch(nbytes)
@@ -142,14 +142,14 @@ int32_t rtc_write(int32_t fd, void* buf, int32_t nbytes)
 		default:
 			return RTC_FAIL;
 	}
-	
+
 	cli(); // disable interrupts
 	outb(REG_A_NMI, RTC_PORT); // choose register A of the rtc with NMI
 	char prev = inb(CMOS_PORT); // get the previous value of reg a
 	outb (REG_A_NMI, RTC_PORT); // choose register A again
 	outb (((prev & FREQ_BITMASK) | rate), CMOS_PORT); // OR our new rate with the lower 4 bits for frequency
 	sti(); // enable interrupts
-	
+
 	// return 0
 	return RTC_SUCCESS;
 }
@@ -172,7 +172,7 @@ int32_t rtc_open(const uint8_t* filename)
 	outb (REG_A_NMI, RTC_PORT); // choose register A again
 	outb (((prev & FREQ_BITMASK) | HZ_2), CMOS_PORT); // OR our new rate with the lower 4 bits for frequency (2Hz)
 	sti(); // enable interrupts
-	
+
 	return RTC_SUCCESS;
 }
 

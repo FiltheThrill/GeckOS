@@ -120,7 +120,7 @@ void update_term(unsigned int t){
 *   RETURN VALUE: number of bytes written (can vary based on screen size)
 *   SIDE EFFECTS: clears the screen
 */
-int32_t term_write(int32_t fd, const uint8_t * buf, int32_t nbytes){
+int32_t term_write(int32_t fd, const void * buf, int32_t nbytes){
   int bytecnt;
   unsigned int idx;
   idx = fetch_process();
@@ -130,7 +130,7 @@ int32_t term_write(int32_t fd, const uint8_t * buf, int32_t nbytes){
   term_clear(idx,0);
   //kill if excedes term buffer size
   while(bytecnt < nbytes && bytecnt < XMAX * YMAX){
-    term_putc(idx,buf[bytecnt]);
+    term_putc(idx,((uint8_t*)buf)[bytecnt]);
     cursorX[term]++;
     bytecnt++;
   }
@@ -148,7 +148,7 @@ int32_t term_write(int32_t fd, const uint8_t * buf, int32_t nbytes){
 *   RETURN VALUE: returns the amount of bytes written
 *   SIDE EFFECTS: writes history if desired, clears screen
 */
-int32_t term_read(int32_t fd, uint8_t * buf, int32_t nbytes){
+int32_t term_read(int32_t fd, void * buf, int32_t nbytes){
   //start at the cmd
   unsigned int idx = fetch_process();
   int32_t i,j;
@@ -168,7 +168,7 @@ int32_t term_read(int32_t fd, uint8_t * buf, int32_t nbytes){
   //pull if inside buffer and set values
   while(i<nbytes && c != 0 && i<BUFMAX){
     c = cmd_buf[idx][i];
-    buf[i] = c;
+    ((uint8_t*)buf)[i] = c;
     i++;
   }
   //clean up and read buffer
