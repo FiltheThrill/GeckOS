@@ -19,9 +19,9 @@
 #define WORD_SIZE 128
 #define ERROR_SIZE 200
 #define PAGE128   32
-
+//https://barrgroup.com/Embedded-Systems/How-To/C-Function-Pointers
 typedef struct { //disgusting
-  int32_t (*read)(int32_t, void*, int32_t);
+  int32_t (*read)(int32_t, void*, int32_t); //int32_t fd, uint8_t * buf, int32_t nbytes
   int32_t (*write)(int32_t, const void*, int32_t);
   int32_t (*open)(const uint8_t*);
   int32_t (*close)(int32_t);
@@ -40,6 +40,10 @@ typedef struct PCB_t{
   //int32_t process; //number to identify which process this pcb is
   struct PCB_t* parent_process; // number to identify parent process(this ould be a pointer as well if you ant to change it)
   int32_t process_on;
+  uint32_t prev_esp0;
+  uint16_t prev_ss0;
+
+
   //ADD STUFF AS YOU SEE FIT I DONT REALLY KNOW WHAT ELSE IS SUPPOSED GO IN HERE
 } PCB_t;
 

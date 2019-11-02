@@ -8,13 +8,16 @@ Author - who even cares anymore*/
 #include "x86_desc.h"
 #include "terminal.h"
 #include "paging.h"
+#include "x86_desc.h"
 
 
-operations_table_t STDIN;
-operations_table_t STDOUT;
+operations_table_t stdin;
+operations_table_t stdout;
 operations_table_t file_table;
 operations_table_t rtc_table;
 operations_table_t directory_table;
+
+int32_t p_process_num;
 
 void PCB_start()
 {
@@ -155,11 +158,53 @@ int32_t execute(const uint8_t* command)
 
 /*+++++++++++++++++++++++++++++ PART 5: Create PCB +++++++++++++++++++++++++++++++++++++++++++++++*/
 
-//need terminal working for this part.
+stdin.read = &term_read;
+stdin.write = 0;
+//stdin.open = &term_open;
+//stdin.close = &term_close;
 
+stdout.read = 0;
+stdout.write = &term_write;
+//stdout.open = &term_open;
+//stdout.close = &term_close;
 
+PCB_six[process_num]->file_array[0].f_op_tbl_ptr = &stdin;
+PCB_six[process_num]->file_array[1].f_op_tbl_ptr = &stdout;
+PCB_six[process_num]->file_array[0].inode = -1;
+PCB_six[process_num]->file_array[0].f_pos = 0;
+PCB_six[process_num]->file_array[0].flags = 1;
+PCB_six[process_num]->file_array[1].inode = -1;
+PCB_six[process_num]->file_array[1].f_pos = 0;
+PCB_six[process_num]->file_array[1].flags = 1;
+
+for(i = 2; i < 8; i++)
+{
+  PCB_six[process_num]->file_array[i].f_op_tbl_ptr = 0;
+  PCB_six[process_num]->file_array[i].inode = -1;
+  PCB_six[process_num]->file_array[i].f_pos = 0;
+  PCB_six[process_num]->file_array[i].flags = 1;
+
+}
+
+if(process_num == 0)
+{
+  PCB_six[process_num]->parent_process = PCB_six[process_num];
+  p_process_num = process_num;
+}
+else
+{
+  PCB_six[process_num]->parent_process = PCB_six[p_process_num];
+  p_process_num = process_num;
+}
 
 /*+++++++++++++++++++++++++++++ PART 6: Context Switch +++++++++++++++++++++++++++++++++++++++++++++++*/
+//lol what
+  PCB_six[process_num]->prev_esp0 = tss.esp0;
+  PCB_six[process_num]->prev_ss0 = tss.ss0;
+
+  tss.esp0 = (uint32_t)(EIGHTMB - (process_num * EIGHTKB));
+  tss.ss0 = KERNEL_DS;
+
   return 0; //compilation's sake
 }
 
