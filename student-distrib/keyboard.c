@@ -136,17 +136,28 @@ int32_t term_write(int32_t fd, const void * buf, int32_t nbytes){
   //get current terminal
   t = fetch_process();
   bytecnt = 0;
+  //shorten to string size
+  if(nbytes != strlen(buf)){
+    nbytes = strlen(buf);
+  }
   //no prompt offset for term writes
   cursoff[t] = 0;
   term_clear(t,0);
   move_cursor(t);
   //kill if excedes screen size
   while(bytecnt < nbytes && bytecnt < XMAX * YMAX){
-    scr_buf[cursorX[t]]= *((uint8_t *) buf);
-    term_putc(t,scr_buf[scrcnt]);
-    scrcnt++;
-    cursorX[t]++;
-    bytecnt++;
+    //allow new lines
+    if(*((uint8_t *) buf) == '\n'){
+      cursorX[t] = 0;
+      cursorY[t]++;
+    }
+    else{
+      scr_buf[cursorX[t]]= *((uint8_t *) buf);
+      term_putc(t,scr_buf[scrcnt]);
+      scrcnt++;
+      cursorX[t]++;
+      bytecnt++;
+    }
     buf = ((uint8_t *) buf + 1);
   }
   //restore offset and adjust screen
