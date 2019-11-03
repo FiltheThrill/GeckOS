@@ -19,6 +19,11 @@
 #define WORD_SIZE 128
 #define ERROR_SIZE 200
 #define PAGE128   32
+#define RTC 0
+#define DIRECTORY 1
+#define FILE 2
+#define IRETESP 0x83FFFFC //128 mb + 4mb - 4
+
 //https://barrgroup.com/Embedded-Systems/How-To/C-Function-Pointers
 typedef struct { //disgusting
   int32_t (*read)(int32_t, void*, int32_t); //int32_t fd, uint8_t * buf, int32_t nbytes
@@ -49,5 +54,22 @@ typedef struct PCB_t{
 
 PCB_t* PCB_six[6];
 
+extern int32_t halt(uint8_t status);
+
+extern int32_t execute(const uint8_t* command);
+
+extern int32_t read(int32_t fd, void* buf, int32_t nbytes);
+
+extern int32_t open(const uint8_t* filename);
+
+extern int32_t close(int32_t fd);
+
+extern int32_t getargs(uint8_t* buf, int32_t nbytes);
+
+extern int32_t vidmap(uint8_t** screen_start);
+
+extern int32_t set_handler(int32_t signum, void* handler_address);
+
+extern int32_t sigreturn(void);
 
 #endif

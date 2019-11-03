@@ -14,8 +14,9 @@
 #include "rtc.h"
 #include "paging.h"
 #include "files.h"
+#include "syscalls.h"
 
-#define RUN_TESTS
+#define RUN_TESTS 0
 
 /* Macros. */
 /* Check if the bit BIT in FLAGS is set. */
@@ -150,15 +151,21 @@ void entry(unsigned long magic, unsigned long addr) {
     clear();
     /* Init the terminal */
     term_init();
+
+
     /* Init the keyboard */
     keyboard_init();
+    printf("attempting to execute shell...\n");
+
 	   /* Init the RTC */
 	   rtc_init();
      /* init files */
      files_init(boot);
     /* Initialize devices, memory, filesystem, enable device interrupts on the
      * PIC, any other initialization stuff... */
-
+     //term_putc('a');
+    // uint8_t buffer[] = "attempting to execute shell";
+     //term_write(1, buffer, 200);
     /* Enable interrupts */
     /* Do not enable the following until after you have set up your
      * IDT correctly otherwise QEMU will triple fault and simple close
@@ -171,7 +178,7 @@ void entry(unsigned long magic, unsigned long addr) {
     launch_tests();
 #endif
     /* Execute the first program ("shell") ... */
-
+    execute((const uint8_t*) "shell ");
     /* Spin (nicely, so we don't chew up cycles) */
     asm volatile (".1: hlt; jmp .1;");
 }

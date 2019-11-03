@@ -23,7 +23,7 @@ syscall_handler:
     pushl %ebp  #is this one needed, who knows i dont care
     pushl %ecx
 
-    pushfl   #push flags? lol idk why not
+    # pushfl   #push flags? lol idk why not
 
     #push the three args (first arg is ebx, second is ecx, thrid is edx)
     pushl %edx
@@ -37,7 +37,7 @@ syscall_handler:
     popl %edx
 
     #pop em like pimples
-    popfl
+    #popfl
     popl %ecx
     popl %ebp
     popl %edx
