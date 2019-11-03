@@ -88,3 +88,11 @@ void term_swap(unsigned int term){
 uint8_t term_addr(unsigned int term){
   return termmem[term];
 }
+//opens the termianl (on 0)
+int32_t term_open(const uint8_t filename){
+  return 0;
+}
+
+int32_t term_close(int32_t fd){
+  return 0;
+}

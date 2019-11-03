@@ -8,4 +8,6 @@ extern void term_put(unsigned int term);
 extern void term_swap(unsigned int term);
 extern int term_start(unsigned int num);
 extern uint8_t term_addr(unsigned int term);
+extern int32_t term_open(const uint8_t filename);
+extern int32_t term_close(int32_t fd);
 #endif
