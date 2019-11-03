@@ -47,8 +47,8 @@
 extern void keyboard_init();
 extern void update_term(unsigned int term);
 extern void keyboard_handler();
-extern int32_t term_write(int32_t fd, const uint8_t * buf, int32_t nbytes);
-extern int32_t term_read(int32_t fd, uint8_t * buf, int32_t nbytes);
+extern int32_t term_write(int32_t fd, const void * buf, int32_t nbytes);
+extern int32_t term_read(int32_t fd, void * buf, int32_t nbytes);
 extern void term_clear(unsigned int t, int op);
 extern void term_putc(unsigned int t, uint8_t c);
 //internals
