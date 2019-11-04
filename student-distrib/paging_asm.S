@@ -30,8 +30,8 @@ paging_en:
 	ret
 
 flush_tlb_asm:
-
+		pushl %eax
 		movl %cr0, %eax
 		movl %eax, %cr0
-
+		popl %eax
 		ret

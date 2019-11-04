@@ -8,7 +8,7 @@
 #define EIGHTMB 0x0800000
 #define FOURMB  0x0400000
 #define EIGHTKB 0x02000
-#define SURP    0x087
+#define SURP    0x097
 #define MAXPROCESSES  6
 #define MAXFILES    8
 #define ELF_MAGIC0 0x7F
@@ -54,6 +54,7 @@ typedef struct PCB_t{
 
 PCB_t* PCB_six[6];
 
+extern void PCB_start();
 extern int32_t halt(uint8_t status);
 
 extern int32_t execute(const uint8_t* command);

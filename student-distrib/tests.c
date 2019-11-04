@@ -25,7 +25,7 @@
 #define READDIR 0
 #define RTCTEST 0
 #define KEYTEST 0
-#define TERMTEST 1
+#define TERMTEST 0
 #define COMMENTFILETEST 0
 /* format these macros as you see fit */
 #define TEST_HEADER 	\
@@ -289,6 +289,7 @@ void read_test()
 	{
 		//term_putc(0,buf[i]);
 	}
+	printf("attempting");
 	term_write(fd, buf, bytes);
 	fclose(fname);
 }
@@ -407,13 +408,14 @@ void key_test(){
 
 void term_test(){
 	int32_t fd = 0;
-	uint8_t buf[128];
+	uint8_t buf[128] = "hello";
 	int32_t nbytes = 128;
 	int32_t write;
 
-	term_clear(0,0);
-	write = term_read(fd,buf,nbytes);
-	term_write(fd,buf,write);
+	//term_clear(0,0);
+	//printf("hello");
+	//write = term_read(fd,buf,nbytes);
+	term_write(fd,buf,200);
 }
 /* Checkpoint 3 tests */
 /* Checkpoint 4 tests */

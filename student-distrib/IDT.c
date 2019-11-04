@@ -24,7 +24,8 @@ void invalid_tss(){exceptions(10);}
 void seg_not_present(){exceptions(11);}
 void stack_seg_fault(){exceptions(12);}
 void general_protection(){exceptions(13);}
-void page_fault(){exceptions(14);}
+void page_fault(){
+  exceptions(14);}
 void reserved0(){exceptions(15);}
 void floating_point(){exceptions(16);}
 void alignment_check(){exceptions(17);}
@@ -54,7 +55,7 @@ void reserved10(){exceptions(31);}
 
 void exceptions(int exception_num)
 {
-  clear();
+  //clear();
   switch(exception_num)
   {
     case 0:
