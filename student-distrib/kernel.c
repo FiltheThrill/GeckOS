@@ -155,12 +155,12 @@ void entry(unsigned long magic, unsigned long addr) {
 
     /* Init the keyboard */
     keyboard_init();
-    printf("attempting to execute shell...\n");
 
 	   /* Init the RTC */
 	   rtc_init();
      /* init files */
      files_init(boot);
+     PCB_start();
     /* Initialize devices, memory, filesystem, enable device interrupts on the
      * PIC, any other initialization stuff... */
      //term_putc('a');
@@ -178,6 +178,7 @@ void entry(unsigned long magic, unsigned long addr) {
     launch_tests();
 #endif
     /* Execute the first program ("shell") ... */
+    printf("Attempting to run shell\n");
     execute((const uint8_t*) "shell ");
     /* Spin (nicely, so we don't chew up cycles) */
     asm volatile (".1: hlt; jmp .1;");

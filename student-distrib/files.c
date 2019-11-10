@@ -7,6 +7,7 @@ diagram in appendix A in mp3 documentation is hella clutch as well*/
 
 #include "files.h"
 #include "lib.h"
+#include "x86_desc.h"
 
 boot_block_t* boot_block;
 dentry_t global_dentry;
@@ -92,10 +93,14 @@ int32_t read_data(uint32_t inode, uint32_t offset, uint8_t* buf, uint32_t length
 {
   int32_t cpy_length, inode_len, inode_num, offset_blocks, offset_bytes, data_idx;
   int bytes_read = 0;
+  int32_t offset_length;
   uint8_t* buf_addr;
   uint8_t* data_blocks;
   int i= 0;
+  int enable_prints = 0;
+  int flag = 0;
   inode_num =  boot_block->num_inodes;
+  
 
   if((inode < 0) || (inode >= inode_num))  // check if inode is in bounds
   {
@@ -125,17 +130,44 @@ int32_t read_data(uint32_t inode, uint32_t offset, uint8_t* buf, uint32_t length
     cpy_length = inode_len - offset;
   }
 
+
   //values for indexing
   data_blocks = (uint8_t*)(inode_addr + inode_num);  //first data block address (uint8_t*?)
   offset_blocks = offset / FOURKB;  //number of complete blocks
   offset_bytes = offset % FOURKB;    //number of bytes into the last block
 
+
+
+
+  // while(cpy_length > 0)
+  // {
+  //   data_idx = inode_addr[inode].data_block_idx[offset_blocks];
+  //   offset_length = FOURKB - offset_bytes;
+  //   if(cpy_length < offset_length)
+  //   {
+  //     offset_length = cpy_length;
+  //   }
+  //   buf_addr = (uint8_t*)(data_blocks + offset_bytes + data_idx * FOURKB);
+  //   memcpy(&buf[i], (const void*)buff_addr, offset_length);
+  //   i = offset_length + i;
+  //   cpy_length = cpy_length - offset_length;
+  //   bytes_read = bytes_read + offset_length
+  //   offset_blocks = offset_blocks + 1;
+  //   offset_bytes = 0;
+  // }
+
   while(1)
   {
     //get info on which data block we are reading from
+    if(enable_prints == 1)
+    {
+      printf("another addr outer loop: %x\n",page_directory[32]);
+    }
     data_idx = inode_addr[inode].data_block_idx[offset_blocks];
+
     for(offset_bytes = offset_bytes; offset_bytes < FOURKB; offset_bytes++)
     {
+
       //4kb * #blocks + offset bytes + starting address for data blocks
       buf_addr = (uint8_t*)(data_blocks + offset_bytes + data_idx * FOURKB);
       buf[i] = *buf_addr;
@@ -148,6 +180,11 @@ int32_t read_data(uint32_t inode, uint32_t offset, uint8_t* buf, uint32_t length
       //needed or else it will page fault
       if(cpy_length <= 0)
       {
+        if(enable_prints == 1)
+        {
+          //page_directory[32] = 0x0800097;
+          printf("another addr7: %x\n",page_directory[32]);
+        }
         return bytes_read;
       }
     }

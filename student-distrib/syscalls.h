@@ -5,10 +5,10 @@
 
 #define VIRTUAL_ADDR 0x08048000
 #define FIRSTPCB 0x07FE000  //first pcb will be at bottom of kernel memory? 8mb - 8kb
-#define EIGHTMB 0x0800000
-#define FOURMB  0x0400000
-#define EIGHTKB 0x02000
-#define SURP    0x097
+#define EIGHTMB (1 << 23)
+#define FOURMB  (1 << 22)
+#define EIGHTKB (1 << 13)
+#define SURP    0x09F
 #define MAXPROCESSES  6
 #define MAXFILES    8
 #define ELF_MAGIC0 0x7F

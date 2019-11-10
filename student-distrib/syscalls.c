@@ -34,6 +34,7 @@ void PCB_start()
 
 int32_t halt(uint8_t status)
 {
+  printf("got to halt\n");
   return 0;
 }
 
@@ -46,8 +47,6 @@ int32_t execute(const uint8_t* command)
   int len_word1, i, check;
   dentry_t word1;
   uint8_t header[FIRST40];
-   cli();
-   printf("checkign command arg\n");
 
   if(command == 0)  //check if command is NULL
   {
@@ -58,7 +57,6 @@ int32_t execute(const uint8_t* command)
 
   check = -1;
 
-  printf("checking # processes\n");
   for(i = 0; i < MAXPROCESSES; i++)
   {
     if(PCB_six[i]->process_on == 0)
@@ -81,8 +79,6 @@ int32_t execute(const uint8_t* command)
 
 
 /*+++++++++++++++++++++++++++++ PART 1: Parse Command +++++++++++++++++++++++++++++++++++++++++++++++*/
-
-printf("parsing\n");
 
   len = strlen((int8_t*) command);
 
@@ -116,8 +112,6 @@ printf("parsing\n");
   }
 /*+++++++++++++++++++++++++++++ PART 2: Executable check +++++++++++++++++++++++++++++++++++++++++++++++*/
 
-  printf("trying to find executable\n");
-
   //check if file name exists
   check = read_dentry_by_name(first_word, &word1);
 
@@ -127,8 +121,6 @@ printf("parsing\n");
     term_write(1, error_buf3, ERROR_SIZE);
     return -1;
   }
-
-  printf("loading 40 bytes\n");
 
   //load first 40 bytes into header buffer
   check = read_data(word1.inode_num, 0, header, FIRST40);
@@ -140,7 +132,6 @@ printf("parsing\n");
     return -1;
   }
 
-  printf("checking elf magic\n");
 
   // compare bytes 0, 1, 2, and 3 with magic elf numbers
   if((header[0] != ELF_MAGIC0) || (header[1] != ELF_MAGIC1) ||
@@ -153,24 +144,30 @@ printf("parsing\n");
 
 /*+++++++++++++++++++++++++++++ PART 3: Paging +++++++++++++++++++++++++++++++++++++++++++++++*/
 
-  printf("setting up virtual map\n");
-
    //set up page directory to map to physical memory and enable S, U , R, and P bits
   page_directory[PAGE128] = ((EIGHTMB + (process_num * FOURMB)) | SURP);
-  printf("addr: %x\n", ((EIGHTMB + (process_num * FOURMB)) | SURP));
-  printf("addr wout surp: %x\n", (EIGHTMB + (process_num * FOURMB)));
   //flush tlb everytime a new process is made
-  flush_tlb();
+  //flush_tlb();
+  asm volatile(
+    "movl %%cr3, %%eax\n"
+    "movl %%eax, %%cr3\n"
+    :
+    :
+    :"eax"
+  );
+
 
 /*+++++++++++++++++++++++++++++ PART 4: Program Loader +++++++++++++++++++++++++++++++++++++++++++++++*/
 
   //get length in bytes of our inode
   inode_t* curr_inode = (inode_t*)(word1.inode_num + inode_addr);
   int32_t length_bytes = curr_inode->length_in_B;
-  printf("%d\n", length_bytes);
-  printf("loading program image\n");
+  //printf("length: %d\n", length_bytes);
+
   //load our program into the program image at 0x08048000
   check = read_data(word1.inode_num, 0, (uint8_t*)VIRTUAL_ADDR, length_bytes);
+//  printf("stop\n");
+  //printf("%d\n", check);
 
   if(check == -1)
   {
@@ -178,9 +175,7 @@ printf("parsing\n");
     term_write(1, error_buf6, ERROR_SIZE);
     return -1;
   }
-
 /*+++++++++++++++++++++++++++++ PART 5: Create PCB +++++++++++++++++++++++++++++++++++++++++++++++*/
-printf("setting up ops table\n");
 
 //setup stdin operations table
 stdin.read = &term_read;
@@ -194,8 +189,6 @@ stdout.write = &term_write;
 stdout.open = &term_open;
 stdout.close = &term_close;
 
-printf("mapping to pcb\n");
-
 //load stdin and stdout into filearray 0 and 1 respectively
 PCB_six[process_num]->file_array[0].f_op_tbl_ptr = &stdin;
 PCB_six[process_num]->file_array[1].f_op_tbl_ptr = &stdout;
@@ -205,7 +198,6 @@ PCB_six[process_num]->file_array[0].flags = 1;
 PCB_six[process_num]->file_array[1].inode = -1;
 PCB_six[process_num]->file_array[1].f_pos = 0;
 PCB_six[process_num]->file_array[1].flags = 1;
-printf("mapping to rest of pcb\n");
 
 //initialize rest of file array
 for(i = 2; i < 8; i++)
@@ -216,8 +208,6 @@ for(i = 2; i < 8; i++)
   PCB_six[process_num]->file_array[i].flags = 1;
 
 }
-
-printf("assigning parents\n");
 
 // if this is is our first proccess make its own parent,
 // otherwise use the last process as parent
@@ -231,56 +221,57 @@ else
   PCB_six[process_num]->parent_process = PCB_six[p_process_num];
   p_process_num = process_num;
 }
-
 /*+++++++++++++++++++++++++++++ PART 6: Context Switch +++++++++++++++++++++++++++++++++++++++++++++++*/
-  //lol what
-  // update esp and ss
-  printf("updating tss\n");
 
+  // update esp and ss
   PCB_six[process_num]->prev_esp0 = tss.esp0;
   PCB_six[process_num]->prev_ss0 = tss.ss0;
 
   tss.esp0 = (uint32_t)(EIGHTMB - ((process_num + 1) * EIGHTKB) - 4);
   tss.ss0 = KERNEL_DS;
-  printf("finding eip\n");
+
 
   uint32_t eip_addr = header[27] << 24;
   eip_addr = eip_addr | (header[26] << 16);
   eip_addr = eip_addr | (header[25] << 8);
   eip_addr = eip_addr | header[24];
 
-  printf("27: %x\n", header[27]);
-  printf("26: %x\n", header[26]);
-  printf("25: %x\n", header[25]);
-  printf("24: %x\n", header[24]);
-  printf("23: %x\n", header[23]);
-  printf("eip: %x\n", eip_addr);
-
   //push iret context
+  //printf("eip: %x\n",eip_addr);
+
+//  fake_iret(eip_addr, IRETESP);
   asm volatile(
+    // "movw  %0, %%ax\n"
+    // "movw %%ax, %%ds\n"
+    // "movl %%esp, %%eax\n"
+    //"cli\n"
     "pushl %0\n"
     "pushl $0x083ffffc\n" //128 + 4 mb - 4bytes for last page
-    "pushfl\n"
+    "pushf\n"
+    // "popl %%eax\n"
+    // "orl $0x200, %%eax\n"
+    //"pushl %%eax\n"
     "pushl %1\n"
     "pushl %2\n"
     :
-    :"r"(USER_DS), "r"(USER_CS), "r"(eip_addr)
+    : "i"(USER_DS), "i"(USER_CS), "r"(eip_addr)
   );
-  printf("pushed shit\n");
-  asm ("iret");
-  printf("?\n");
+  asm volatile (
+    "iret\n"
+  );
+  //fake_iret(eip_addr, IRETESP);
+
   return 0; //compilation's sake
 }
 
 int32_t read(int32_t fd, void* buf, int32_t nbytes)
 {
-
-  return 0;
+  return PCB_six[c_proccess_num]->file_array[fd].f_op_tbl_ptr->read(fd, buf, nbytes);
 }
 
 int32_t write(int32_t fd, const void* buf, int32_t nbytes)
 {
-  return 0;
+ return PCB_six[c_proccess_num]->file_array[fd].f_op_tbl_ptr->write(fd, buf, nbytes);
 }
 
 int32_t open(const uint8_t* filename)

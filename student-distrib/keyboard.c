@@ -163,7 +163,7 @@ int32_t term_write(int32_t fd, const void * buf, int32_t nbytes){
   //restore offset and adjust screen
   cursoff[t] = CURSOROFF;
   cursorX[t]++;
-  move_cursor(t);
+  //move_cursor(t);
   return bytecnt;
 }
 

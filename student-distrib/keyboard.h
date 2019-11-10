@@ -11,7 +11,7 @@
 #define XMAX        0x50        //max amount of chars on a line
 #define YMAX        0x19        //max amount of allowed rows
 #define SCRSIZE     0x7D0       //size of the screen
-#define CURSOROFF   0x07        //offset for cursor to allow prompt
+#define CURSOROFF   0x00        //offset for cursor to allow prompt
 #define CURSORLB    0x0F        //write to low cursor byte
 #define CURSORHB    0x0E        //write to high cursor byte
 #define CURSORLA    0x3D4       //low mem loc for cursor
