@@ -135,7 +135,7 @@ void update_term(unsigned int t){
 int32_t term_write(int32_t fd, const void * buf, int32_t nbytes){
   int bytecnt;
   unsigned int t;
-  unsigned int cnt;
+  unsigned int save;
   //get current terminal
   t = fetch_process();
   bytecnt = 0;
@@ -144,7 +144,8 @@ int32_t term_write(int32_t fd, const void * buf, int32_t nbytes){
     nbytes = strlen(buf);
   }
   cli();
-  cnt = 0;
+  save = cursorX[t];
+  cursorX[t] = 0;
   //kill if excedes screen size
   while(bytecnt < nbytes && bytecnt < XMAX * YMAX){
     //allow new lines
@@ -153,10 +154,10 @@ int32_t term_write(int32_t fd, const void * buf, int32_t nbytes){
       cursorY[t]++;
     }
     else{
-      scr_buf[cnt + XMAX * active_ln] = *((uint8_t *) buf);
-      term_putc(t, scr_buf[cnt + XMAX * active_ln]);
+      scr_buf[cursorX[t] + XMAX * active_ln] = *((uint8_t *) buf);
+      term_putc(t, scr_buf[cursorX[t] + XMAX * active_ln]);
       bytecnt++;
-      cnt++;
+      cursorX[t]++;
       if(*((uint8_t *) buf) == '>'){
         //found the cmd prompt
         cursoff[t] = scrcnt;
@@ -164,7 +165,8 @@ int32_t term_write(int32_t fd, const void * buf, int32_t nbytes){
     }
     buf = ((uint8_t *) buf + 1);
   }
-  //restore offset and adjust screen
+  //restore cursor and adjust screen
+  cursorX[t] = save;
   sti();
   return bytecnt;
 }
