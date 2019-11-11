@@ -47,12 +47,17 @@ typedef struct PCB_t{
   int32_t process_on;
   uint32_t prev_esp0;
   uint16_t prev_ss0;
-
-
+  uint32_t esp;
+  uint32_t ebp;
+  int32_t index;
+  int32_t p_index;
   //ADD STUFF AS YOU SEE FIT I DONT REALLY KNOW WHAT ELSE IS SUPPOSED GO IN HERE
 } PCB_t;
 
 PCB_t* PCB_six[6];
+
+int32_t p_process_num;
+int32_t c_process_num;
 
 extern void PCB_start();
 extern int32_t halt(uint8_t status);

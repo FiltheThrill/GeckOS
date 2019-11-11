@@ -8,6 +8,7 @@ diagram in appendix A in mp3 documentation is hella clutch as well*/
 #include "files.h"
 #include "lib.h"
 #include "x86_desc.h"
+#include "syscalls.h"
 
 boot_block_t* boot_block;
 dentry_t global_dentry;
@@ -93,14 +94,13 @@ int32_t read_data(uint32_t inode, uint32_t offset, uint8_t* buf, uint32_t length
 {
   int32_t cpy_length, inode_len, inode_num, offset_blocks, offset_bytes, data_idx;
   int bytes_read = 0;
-  int32_t offset_length;
+  //int32_t offset_length;
   uint8_t* buf_addr;
   uint8_t* data_blocks;
   int i= 0;
-  int enable_prints = 0;
-  int flag = 0;
+
   inode_num =  boot_block->num_inodes;
-  
+
 
   if((inode < 0) || (inode >= inode_num))  // check if inode is in bounds
   {
@@ -159,10 +159,6 @@ int32_t read_data(uint32_t inode, uint32_t offset, uint8_t* buf, uint32_t length
   while(1)
   {
     //get info on which data block we are reading from
-    if(enable_prints == 1)
-    {
-      printf("another addr outer loop: %x\n",page_directory[32]);
-    }
     data_idx = inode_addr[inode].data_block_idx[offset_blocks];
 
     for(offset_bytes = offset_bytes; offset_bytes < FOURKB; offset_bytes++)
@@ -180,11 +176,6 @@ int32_t read_data(uint32_t inode, uint32_t offset, uint8_t* buf, uint32_t length
       //needed or else it will page fault
       if(cpy_length <= 0)
       {
-        if(enable_prints == 1)
-        {
-          //page_directory[32] = 0x0800097;
-          printf("another addr7: %x\n",page_directory[32]);
-        }
         return bytes_read;
       }
     }
@@ -206,20 +197,6 @@ int32_t read_data(uint32_t inode, uint32_t offset, uint8_t* buf, uint32_t length
  */
 int32_t fopen(const uint8_t* fname)
 {
-   int32_t check;
-   //copies file given by fname into global dentry
-   check = read_dentry_by_name(fname, &global_dentry);
-
-   if(check == FAILURE)  //check if it found the file
-   {
-     return FAILURE;
-   }
-
-   if(global_dentry.file_type != 2) //check if file type is a file
-   {
-     return FAILURE;
-   }
-
   return SUCCESS;
 }
 
@@ -262,7 +239,21 @@ int32_t fwrite(int32_t fd, const void* buf, int32_t nbytes)
 int32_t fread(int32_t fd, void* buf, int32_t nbytes)
 {
   int32_t bytes_read;
-  bytes_read = read_data(global_dentry.inode_num, 0, buf, nbytes);
+  uint32_t inode, offset, len;
+
+
+  inode = PCB_six[c_process_num]->file_array[fd].inode;
+  offset = PCB_six[c_process_num]->file_array[fd].f_pos;
+  len = inode_addr[inode].length_in_B;
+
+  if(offset >= len)
+  {
+    return 0;
+  }
+
+  bytes_read = read_data(inode, offset, buf, nbytes);
+  PCB_six[c_process_num]->file_array[fd].f_pos += bytes_read;
+
   return bytes_read;
 }
 
@@ -276,20 +267,6 @@ int32_t fread(int32_t fd, void* buf, int32_t nbytes)
  */
 int32_t dopen(const uint8_t* fname)
 {
-  int32_t check;
-  //copies file given by fname into global dentry
-  check = read_dentry_by_name(fname, &global_dentry);
-
-  if(check == FAILURE)   //check if it found the file
-  {
-    return FAILURE;
-  }
-
-  if(global_dentry.file_type != 1)  //check if file type is a directory
-  {
-    return FAILURE;
-  }
-
  return SUCCESS;
 }
 
@@ -326,20 +303,22 @@ int32_t dread(int32_t fd, void* buf, int32_t nbytes)
   int32_t check;
   uint32_t name_length;
   int bytes_read = 0;
+  dentry_t read_dentry;
 
-  if((d_index < 0) || (d_index > 16))//check if its in bounds of the directories
+  if((d_index > 16))//check if its in bounds of the directories
   {
-    return FAILURE;
+    d_index =  0;
+    return 0;
   }
 
-  check = read_dentry_by_index(d_index, &global_dentry);  //finds directory by index and checks if it found it
+  check = read_dentry_by_index(d_index, &read_dentry);  //finds directory by index and checks if it found it
 
   if(check == FAILURE)
   {
-    return FAILURE;
+    return 0;
   }
 
-  name_length = strlen((int8_t*)global_dentry.file_name);
+  name_length = strlen((int8_t*)read_dentry.file_name);
 
   if(name_length > RESERVED32B) //make sure name is less than 32
   {
@@ -347,7 +326,7 @@ int32_t dread(int32_t fd, void* buf, int32_t nbytes)
   }
   for(i = 0; i < name_length; i++)  //place directories into buf
   {
-    ((uint8_t*)buf)[i] = global_dentry.file_name[i];
+    ((uint8_t*)buf)[i] = read_dentry.file_name[i];
     bytes_read++;
   }
   d_index++;
