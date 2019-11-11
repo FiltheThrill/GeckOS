@@ -409,8 +409,8 @@ void key_test(){
 void term_test(){
 	int32_t fd = 0;
 	uint8_t buf[128] = "hello";
-	int32_t nbytes = 128;
-	int32_t write;
+	//int32_t nbytes = 128;
+	//int32_t write;
 
 	//term_clear(0,0);
 	//printf("hello");

@@ -58,19 +58,21 @@ int32_t halt(uint8_t status)
   ebp_ret = PCB_six[c_process_num]->ebp;
   tss.esp0 = PCB_six[c_process_num]->prev_esp0;
   //tss.ss0 = PCB_six[c_process_num]->prev_ss0;
-  for(i = 0; i < MAXFILES; i++)
-  {
-    PCB_six[c_process_num]->file_array[i].f_op_tbl_ptr = 0;
-    PCB_six[c_process_num]->file_array[i].inode = -1;
-    PCB_six[c_process_num]->file_array[i].f_pos = 0;
-    PCB_six[c_process_num]->file_array[i].flags = 0;
-  }
+
   if(c_process_num == 0)
   {
     root_check = 1;
   }
+  //if not the  root reset everything and reset the current process number
   if(root_check == 0)
   {
+    for(i = 0; i < MAXFILES; i++)
+    {
+      PCB_six[c_process_num]->file_array[i].f_op_tbl_ptr = 0;
+      PCB_six[c_process_num]->file_array[i].inode = -1;
+      PCB_six[c_process_num]->file_array[i].f_pos = 0;
+      PCB_six[c_process_num]->file_array[i].flags = 0;
+    }
     PCB_six[c_process_num]->process_on = 0;
     PCB_six[c_process_num]->ebp = 0;
     PCB_six[c_process_num]->esp = 0;
@@ -83,6 +85,7 @@ int32_t halt(uint8_t status)
     p_process_num = parent->p_index;
   }
 
+  //update page directory entry
   page_directory[PAGE128] = ((EIGHTMB + (c_process_num * FOURMB)) | SURP);
   asm volatile(
     "movl %%cr3, %%eax\n"
@@ -91,14 +94,16 @@ int32_t halt(uint8_t status)
     :
     :"eax"
   );
-  uint32_t volatile temp = (uint32_t)status;
+
+  uint32_t temp = (uint32_t)status;
+  // update return value stack pointer and base pointer for jump to execute
   asm volatile(
-      "mov %%ebx, %%eax\n"
+      "movl %0, %%eax\n"
       :
-      :"b"(temp)
+      :"r"(temp)
     );
   asm volatile(
-      "mov %%ebx, %%esp\n"
+      "movl %%ebx, %%esp\n"
       :
       :"b"(esp_ret)
     );
@@ -107,12 +112,7 @@ int32_t halt(uint8_t status)
       :
       :"b"(ebp_ret)
     );
-  // asm("movl %%ebx, %%eax\n"
-  //   "movl %1, %%esp\n"
-  //   "movl %2, %%ebp\n"
-  //   :
-  //   :"r"(temp), "r"(esp_ret), "r"(ebp_ret)
-  // );
+//leave and return to execute
   asm volatile(
     "leave\n"
     "ret"
@@ -164,13 +164,6 @@ int32_t execute(const uint8_t* command)
       break;
     }
   }
-  // printf("%d\n", c_process_num);
-  // printf("%d\n", c_process_num);
-  // printf("%d\n", c_process_num);
-  // printf("%d\n", c_process_num);
-  // printf("%d\n", c_process_num);
-  // printf("%d\n", c_process_num);
-  // printf("%d\n", c_process_num);
 
   if(check == FAILURE)   //a max amount of 6 processes can be running at any time
   {
@@ -214,7 +207,7 @@ int32_t execute(const uint8_t* command)
     rest_of_word[i - len_word1] = '\0';
   }
 /*+++++++++++++++++++++++++++++ PART 2: Executable check +++++++++++++++++++++++++++++++++++++++++++++++*/
-  //printf("%s\n", first_word);
+
   //check if file name exists
   check = read_dentry_by_name(first_word, &word1);
 
@@ -250,7 +243,6 @@ int32_t execute(const uint8_t* command)
    //set up page directory to map to physical memory and enable S, U , R, and P bits
   page_directory[PAGE128] = ((EIGHTMB + (process_num * FOURMB)) | SURP);
   //flush tlb everytime a new process is made
-  //flush_tlb();
   asm volatile(
     "movl %%cr3, %%eax\n"
     "movl %%eax, %%cr3\n"
@@ -381,10 +373,10 @@ else
  */
 int32_t read(int32_t fd, void* buf, int32_t nbytes)
 {
-  // if((fd == STDOUTFD) || (fd > MAXFD) || (fd < MINFD) || (PCB_six[c_process_num]->file_array[fd].flags == 0))
-  // {
-  //   return 0;
-  // }
+   if((fd == STDOUTFD) || (fd > MAXFD) || (fd < 0) || (PCB_six[c_process_num]->file_array[fd].flags == 0))
+   {
+     return 0;
+   }
   return PCB_six[c_process_num]->file_array[fd].f_op_tbl_ptr->read(fd, buf, nbytes);
 }
 

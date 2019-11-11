@@ -143,6 +143,9 @@ int32_t term_write(int32_t fd, const void * buf, int32_t nbytes){
     if(*((uint8_t *) buf) == '\n'){
        //cursorX[t] = 0;
        //cursorY[t]++;
+       term_putc(t, 0);
+       bytecnt++;
+       cursorX[t]++;
      }
     else{
       put = *((uint8_t *) buf);

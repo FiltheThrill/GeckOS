@@ -309,10 +309,9 @@ int32_t dread(int32_t fd, void* buf, int32_t nbytes)
   int i;
   int32_t check;
   uint32_t name_length;
-  int bytes_read = 0;
   dentry_t read_dentry;
 
-  if((d_index > 16))//check if its in bounds of the directories
+  if(d_index > 16)//check if its in bounds of the directories
   {
     d_index =  0;
     return 0;
@@ -332,10 +331,16 @@ int32_t dread(int32_t fd, void* buf, int32_t nbytes)
     name_length = RESERVED32B;
   }
   //printf("%d\n", name_length);
+
   for(i = 0; i < name_length; i++)  //place directories into buf
   {
     ((uint8_t*)buf)[i] = read_dentry.file_name[i];
   }
+  if(name_length != RESERVED32B)
+  {
+    ((uint8_t*)buf)[i+1] = ' ';
+  }
+  //printf("i:%d d:%d ", i, d_index);
   d_index++;
-  return name_length;
+  return i;
 }

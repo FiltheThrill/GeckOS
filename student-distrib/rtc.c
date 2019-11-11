@@ -81,9 +81,10 @@ int32_t rtc_read(int32_t fd, void* buf, int32_t nbytes)
 {
 	// a volatile interrupt flag which is changed to 0 in the RTC handler
 	// loops and does nothing waiting for next interrupt to occur
+	sti();
 	rtc_interrupt_flag = 1;
 	while (rtc_interrupt_flag);
-
+	cli();
 	return RTC_SUCCESS;
 }
 
