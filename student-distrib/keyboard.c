@@ -38,7 +38,7 @@ static char scancode_caps[] = {0, 0, '1', '2', '3', '4', '5', '6', '7', '8', '9'
                              0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, '7', '8', '9', '-', '4',
                             '5', '6', '+', '1', '2', '3', '0', '.'};
 //prompt to display in term
-static char prompt[CURSOROFF] = {'[','t','e','r','m',']','>'};
+static char prompt[20] = {'[','t','e','r','m',']','>'};
 //dynamic vars (made volatile to survive running)
 //all keyboard uses for each possible terminal are stored here
 volatile unsigned int term;                   //global for current terminal 0,(1,2,3,4 for multiterm)
@@ -49,6 +49,7 @@ volatile unsigned int cmd_len[TNUM];          //global for each command length
 volatile char cmd_buf[TNUM][BUFMAX];          //global cmd store for any terminal
 volatile char scr_buf[SCRSIZE];               //stores the whole cur screen to work on
 volatile unsigned int scrcnt;                 //track the # of char input
+volatile int active_ln;                       //current active line being typed on
 volatile int cursorX[TNUM];                   //cursor x val
 volatile int cursorY[TNUM];                   //cursor y val(line num)
 volatile uint8_t attr[TNUM];                  //attributes for console
@@ -110,6 +111,7 @@ void keyboard_init(){
   //set term num to first term (0)
   term = 0;
   scrcnt = 0;
+  active_ln = 0;
   //enable req and set screen
   term_clear(term,0);
   move_cursor(term);
@@ -140,10 +142,16 @@ int32_t term_write(int32_t fd, const void * buf, int32_t nbytes){
   if(nbytes != strlen(buf)){
     nbytes = strlen(buf);
   }
-  //no prompt offset for term writes
-  cursoff[t] = 0;
-  term_clear(t,0);
-  move_cursor(t);
+  //go to newln by space filling the row
+  if(scrcnt != 0){
+    while(cursorX[t] < XMAX){
+      scr_buf[cursorX[t] + XMAX * cursorY[t]] = ' ';
+      scrcnt++;
+      cursorX[t]++;
+    }
+    cursorY[t]++;
+    cursorX[t] = 0;
+  }
   //kill if excedes screen size
   while(bytecnt < nbytes && bytecnt < XMAX * YMAX){
     //allow new lines
@@ -152,18 +160,23 @@ int32_t term_write(int32_t fd, const void * buf, int32_t nbytes){
       cursorY[t]++;
     }
     else{
-      scr_buf[cursorX[t]]= *((uint8_t *) buf);
-      term_putc(t,scr_buf[scrcnt]);
+      scr_buf[cursorX[t] + XMAX * cursorY[t]]= *((uint8_t *) buf);
+      term_putc(t, scr_buf[cursorX[t] + XMAX * cursorY[t]]);
       scrcnt++;
       cursorX[t]++;
       bytecnt++;
+      if(*((uint8_t *) buf) == '>'){
+        //found the cmd prompt
+        cursoff[t] = scrcnt;
+      }
     }
     buf = ((uint8_t *) buf + 1);
   }
   //restore offset and adjust screen
-  cursoff[t] = CURSOROFF;
   cursorX[t]++;
   move_cursor(t);
+  move_cursor(t);
+  active_ln = cursorY[t];
   return bytecnt;
 }
 
@@ -183,10 +196,8 @@ int32_t term_read(int32_t fd, void * buf, int32_t nbytes){
   int32_t i,j;
   char c;
   //wait for command completion (spam?)
-  while(1){
-    if(termRead[t] == 'y'){
-      break;
-    }
+  if(termRead[t] == 'n'){
+    return 0;
   }
   //save entered command
   if(USEHIST == 1){
@@ -250,8 +261,6 @@ void keyboard_handler(){
     case 1:  //no new char write, handled in cases
       break;
     case 2:  //stop char encountered, handle
-      term_clear(term,0);
-      move_cursor(term);
       break;
     default:
       break;
@@ -739,7 +748,7 @@ char generate_char(uint8_t scancode){
 void fill_cmdbuf(){
   int i,j;
   j = 0;
-  i=cursoff[term];
+  i=cursoff[term] + XMAX * active_ln;
   //write from the startpos to the cmd_buf
   while(j<BUFMAX && scr_buf[i] != NULLCHAR){
     cmd_buf[term][j] = scr_buf[i];
@@ -747,6 +756,23 @@ void fill_cmdbuf(){
     j++;
   }
   return;
+}
+/*
+* print_prompt
+*   DESCRIPTION: print the prompt on a given line
+*   INPUTS: none
+*   OUTPUTS: none
+*   RETURN VALUE: none
+*   SIDE EFFECTS: prints the current prompt
+*/
+void print_prompt(){
+  int i;
+  for(i=0;i<cursoff[term];i++){
+    term_putc(term,prompt[i]);
+    scr_buf[cursorX[term]] = prompt[i];
+    cursorX[term]++;
+    scrcnt++;
+  }
 }
 /*
 * history_fetch
@@ -867,6 +893,7 @@ void term_clear(unsigned int t, int op){
   for(i=0;i<SCRSIZE;i++){
     scr_buf[i] = NULLCHAR;
   }
+  active_ln = 0;
   scrcnt = 0;
   cursorX[t] = 0;
   cursorY[t] = 0;
