@@ -282,7 +282,14 @@ int32_t dclose(int32_t fd)
 {
   return SUCCESS;
 }
-
+/*
+ * fwrite
+ *   DESCRIPTION: this is a read only file system
+ *   INPUTS: fname: name of file
+ *   OUTPUTS: none
+ *   RETURN VALUE: 0 for success -1 for failure
+ *   SIDE EFFECTS: none
+ */
 int32_t dwrite(int32_t fd, const void* buf, int32_t nbytes)
 {
   return FAILURE;
@@ -324,11 +331,11 @@ int32_t dread(int32_t fd, void* buf, int32_t nbytes)
   {
     name_length = RESERVED32B;
   }
+  //printf("%d\n", name_length);
   for(i = 0; i < name_length; i++)  //place directories into buf
   {
     ((uint8_t*)buf)[i] = read_dentry.file_name[i];
-    bytes_read++;
   }
   d_index++;
-  return bytes_read;
+  return name_length;
 }

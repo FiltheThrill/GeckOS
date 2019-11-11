@@ -23,6 +23,11 @@
 #define DIRECTORY 1
 #define FILE 2
 #define IRETESP 0x83FFFFC //128 mb + 4mb - 4
+#define MINFD   2
+#define MAXFD   7
+#define STDINFD 0
+#define STDOUTFD 1
+#define PAGESIZE 4
 
 //https://barrgroup.com/Embedded-Systems/How-To/C-Function-Pointers
 typedef struct { //disgusting
