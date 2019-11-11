@@ -135,6 +135,7 @@ void update_term(unsigned int t){
 int32_t term_write(int32_t fd, const void * buf, int32_t nbytes){
   int bytecnt;
   unsigned int t;
+  unsigned int cnt;
   //get current terminal
   t = fetch_process();
   bytecnt = 0;
@@ -142,16 +143,8 @@ int32_t term_write(int32_t fd, const void * buf, int32_t nbytes){
   if(nbytes != strlen(buf)){
     nbytes = strlen(buf);
   }
-  //go to newln by space filling the row
-  if(scrcnt != 0){
-    while(cursorX[t] < XMAX){
-      scr_buf[cursorX[t] + XMAX * cursorY[t]] = ' ';
-      scrcnt++;
-      cursorX[t]++;
-    }
-    cursorY[t]++;
-    cursorX[t] = 0;
-  }
+  cli();
+  cnt = 0;
   //kill if excedes screen size
   while(bytecnt < nbytes && bytecnt < XMAX * YMAX){
     //allow new lines
@@ -160,11 +153,10 @@ int32_t term_write(int32_t fd, const void * buf, int32_t nbytes){
       cursorY[t]++;
     }
     else{
-      scr_buf[cursorX[t] + XMAX * cursorY[t]]= *((uint8_t *) buf);
-      term_putc(t, scr_buf[cursorX[t] + XMAX * cursorY[t]]);
-      scrcnt++;
-      cursorX[t]++;
+      scr_buf[cnt + XMAX * active_ln] = *((uint8_t *) buf);
+      term_putc(t, scr_buf[cnt + XMAX * active_ln]);
       bytecnt++;
+      cnt++;
       if(*((uint8_t *) buf) == '>'){
         //found the cmd prompt
         cursoff[t] = scrcnt;
@@ -173,10 +165,7 @@ int32_t term_write(int32_t fd, const void * buf, int32_t nbytes){
     buf = ((uint8_t *) buf + 1);
   }
   //restore offset and adjust screen
-  cursorX[t]++;
-  move_cursor(t);
-  move_cursor(t);
-  active_ln = cursorY[t];
+  sti();
   return bytecnt;
 }
 
@@ -261,6 +250,17 @@ void keyboard_handler(){
     case 1:  //no new char write, handled in cases
       break;
     case 2:  //stop char encountered, handle
+      //go to newln by space filling the
+      if(scrcnt != 0){
+        while(cursorX[term] < XMAX){
+          scr_buf[cursorX[term] + XMAX * cursorY[term]] = ' ';
+          scrcnt++;
+          cursorX[term]++;
+        }
+        cursorY[term]++;
+        cursorX[term] = 0;
+      }
+      active_ln = cursorY[term];
       break;
     default:
       break;
