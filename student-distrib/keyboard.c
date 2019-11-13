@@ -50,6 +50,7 @@ volatile char cmd_buf[TNUM][BUFMAX];          //global cmd store for any termina
 volatile char scr_buf[SCRSIZE];               //stores the whole cur screen to work on
 volatile unsigned int scrcnt;                 //track the # of char input
 volatile int active_ln;                       //current active line being typed on
+volatile int cmd_idx;
 volatile int cursorX[TNUM];                   //cursor x val
 volatile int cursorY[TNUM];                   //cursor y val(line num)
 volatile uint8_t attr[TNUM];                  //attributes for console
@@ -78,7 +79,7 @@ void keyboard_init(){
     termRead[i] = 'n';
     cmd_len[i] = 0;
     cursorX[i] = 0;
-    cursorY[i] = 0;
+    cursorY[i] = -1;
     histnum[i] = 0;
     cursoff[i] = CURSOROFF;
     //change for color?
@@ -112,8 +113,8 @@ void keyboard_init(){
   term = 0;
   scrcnt = 0;
   active_ln = 0;
+  cmd_idx = 0;
   //enable req and set screen
-  term_clear(term,0);
   move_cursor(term);
   enable_irq(KEYIRQ);
   return;
@@ -134,39 +135,48 @@ void update_term(unsigned int t){
 */
 int32_t term_write(int32_t fd, const void * buf, int32_t nbytes){
   int bytecnt;
-  unsigned int t;
-  unsigned int save;
+  unsigned int t,i;
   //get current terminal
   t = fetch_process();
   bytecnt = 0;
   //shorten to string size
-  if(nbytes != strlen(buf)){
+  if(nbytes > strlen(buf)){
     nbytes = strlen(buf);
   }
   cli();
-  save = cursorX[t];
+  if(cursorY[t] != -1){
+    for(i=cursorX[t];i<XMAX;i++){
+      //scr_buf[i + XMAX * cursorY[t]] = ':';
+    }
+  }
   cursorX[t] = 0;
+  cursorY[t]++;
+  scrcnt = cursorY[t] * XMAX;
   //kill if excedes screen size
   while(bytecnt < nbytes && bytecnt < XMAX * YMAX){
-    //allow new lines
+    //allow new lines (or not)
     if(*((uint8_t *) buf) == '\n'){
-      cursorX[t] = 0;
-      cursorY[t]++;
+      scr_buf[cursorX[t] + XMAX * active_ln] = ' ';
+      bytecnt++;
+      cursorX[t]++;
+      scrcnt++;
     }
     else{
       scr_buf[cursorX[t] + XMAX * active_ln] = *((uint8_t *) buf);
       term_putc(t, scr_buf[cursorX[t] + XMAX * active_ln]);
       bytecnt++;
       cursorX[t]++;
+      scrcnt++;
       if(*((uint8_t *) buf) == '>'){
         //found the cmd prompt
         cursoff[t] = scrcnt;
+        cmd_idx = cursorX[t] + XMAX * cursorY[t];
       }
     }
     buf = ((uint8_t *) buf + 1);
   }
   //restore cursor and adjust screen
-  cursorX[t] = save;
+  move_cursor(term);
   sti();
   return bytecnt;
 }
@@ -186,10 +196,11 @@ int32_t term_read(int32_t fd, void * buf, int32_t nbytes){
   unsigned int t = fetch_process();
   int32_t i,j;
   char c;
+  sti();
   //wait for command completion (spam?)
-  if(termRead[t] == 'n'){
-    return 0;
+  while(termRead[t] == 'n'){
   }
+  cli();
   //save entered command
   if(USEHIST == 1){
     history_write();
@@ -210,6 +221,7 @@ int32_t term_read(int32_t fd, void * buf, int32_t nbytes){
   //reset vals, ret bytes read
   cmd_len[t] = 0;
   termRead[t] = 'n';
+  sti();
   return i;
 }
 /*
@@ -252,17 +264,6 @@ void keyboard_handler(){
     case 1:  //no new char write, handled in cases
       break;
     case 2:  //stop char encountered, handle
-      //go to newln by space filling the
-      if(scrcnt != 0){
-        while(cursorX[term] < XMAX){
-          scr_buf[cursorX[term] + XMAX * cursorY[term]] = ' ';
-          scrcnt++;
-          cursorX[term]++;
-        }
-        cursorY[term]++;
-        cursorX[term] = 0;
-      }
-      active_ln = cursorY[term];
       break;
     default:
       break;
@@ -332,7 +333,7 @@ int validate_cursor(uint8_t t){
     return 1;
   }
   //dont move into prompt
-  if(cursorX[t] < cursoff[t] && cursorY[t] == 0){
+  if(cursorX[t] < cursoff[t] && cursorY[t] == active_ln){
     cursorX[t] = cursoff[t];
     return 1;
   }
@@ -750,12 +751,15 @@ char generate_char(uint8_t scancode){
 void fill_cmdbuf(){
   int i,j;
   j = 0;
-  i=cursoff[term] + XMAX * active_ln;
+  i = cmd_idx;
   //write from the startpos to the cmd_buf
   while(j<BUFMAX && scr_buf[i] != NULLCHAR){
-    cmd_buf[term][j] = scr_buf[i];
+    if(scr_buf[i] != ' '){
+      cmd_buf[term][j] = scr_buf[i];
+      printf("%c",scr_buf[i]);
+      j++;
+    }
     i++;
-    j++;
   }
   return;
 }
@@ -895,6 +899,7 @@ void term_clear(unsigned int t, int op){
   for(i=0;i<SCRSIZE;i++){
     scr_buf[i] = NULLCHAR;
   }
+  cursoff[t] = CURSOROFF;
   active_ln = 0;
   scrcnt = 0;
   cursorX[t] = 0;
@@ -906,6 +911,7 @@ void term_clear(unsigned int t, int op){
     cursorX[t]++;
     scrcnt++;
   }
+  cmd_idx = cursorX[t];
   //caller chose to add cmd buffer to screen
   if(op == 1){
     cnt = 0;
