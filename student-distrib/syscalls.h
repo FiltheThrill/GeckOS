@@ -11,7 +11,7 @@
 #define SURP    0x09F
 #define MAXPROCESSES  6
 #define MAXFILES    8
-#define MAXARGS  1000 //? arbitrary max length
+#define MAXARGS  128 //? arbitrary max length
 #define ELF_MAGIC0 0x7F
 #define ELF_MAGIC1  0x45
 #define ELF_MAGIC2 0x4C

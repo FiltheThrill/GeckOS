@@ -36,7 +36,6 @@ void paging_init()
   attr = get_attr('u',7);
   page_directory[0] = attr;
 	// Set 4-8MB to the kernel address as a 4MB PDE
-	// Set more attributes
 	page_directory[1] = KERNEL_ADDR;
 	page_directory[1] |= KERNEL_PAGE_INIT;
 

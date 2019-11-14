@@ -183,14 +183,6 @@ int32_t execute(const uint8_t* command)
 
   len = strlen((int8_t*) command);
 
-  //save the entered commandand set argsize
-  i=0;
-  while(i<len && i<MAXARGS){
-    PCB_six[c_process_num]->args[i] = command[i];
-    i++;
-  }
-  PCB_six[c_process_num]->argsize = i;
-
   for(i = 0; i < len; i++)  //find where first word ends
   {
     if(command[i] ==  ' ')   //space separated command
@@ -217,8 +209,17 @@ int32_t execute(const uint8_t* command)
     {
       rest_of_word[i - len_word1 - 1] = command[i];
     }
-    rest_of_word[i - len_word1] = '\0';
+    //rest_of_word[i - len_word1] = '\0';
   }
+  //save the entered commandand set argsize
+  printf("word: %s\n", rest_of_word);
+  i=len_word1;
+  while(i<len && i<MAXARGS){
+    PCB_six[c_process_num]->args[i] = rest_of_word[i];
+    i++;
+  }
+  i++;
+  PCB_six[c_process_num]->argsize = i-len_word1;
 /*+++++++++++++++++++++++++++++ PART 2: Executable check +++++++++++++++++++++++++++++++++++++++++++++++*/
 
   //check if file name exists
