@@ -135,17 +135,17 @@ int32_t term_write(int32_t fd, const void * buf, int32_t nbytes){
     nbytes = strlen(buf);
   }
   cli();
-  cursorY[t]++;
-  cursorX[t] = 0;
+  // cursorY[t]++;
+  // cursorX[t] = 0;
   //kill if excedes screen size
   while(bytecnt < nbytes && bytecnt < XMAX * YMAX){
     //allow new lines
     if(*((uint8_t *) buf) == '\n'){
-       //cursorX[t] = 0;
-       //cursorY[t]++;
+       cursorX[t] = 0;
+       cursorY[t]++;
        term_putc(t, 0);
        bytecnt++;
-       cursorX[t]++;
+       //cursorX[t]++;
      }
     else{
       put = *((uint8_t *) buf);
@@ -298,6 +298,9 @@ void keyboard_handler(){
     case 1:  //no new char write, handled in cases
       break;
     case 2:  //stop char encountered, handle
+      cursorY[term]++;
+      cursorX[term] = 0;
+      move_cursor(term);
       break;
     default:
       break;

@@ -144,14 +144,18 @@ int32_t execute(const uint8_t* command)
   uint8_t first_word[WORD_SIZE];    //128?
   uint8_t rest_of_word[WORD_SIZE];
   int32_t len;
-  int len_word1 = 0, i, check;
+  int len_word1 = 0, i, check, flag = 0, error_flag = 0;
   dentry_t word1;
+  uint32_t base, stack;
   uint8_t header[FIRST40];
   //cli();
   if(command == 0)  //check if command is NULL
   {
     uint8_t error_buf1[] = "Invalid cmd";
     term_write(1, error_buf1, ERROR_SIZE);
+    PCB_six[process_num]->ebp = base;
+    PCB_six[process_num]->esp = stack;
+    halt(255);
     return FAILURE;
   }
 
@@ -172,9 +176,9 @@ int32_t execute(const uint8_t* command)
 
   if(check == FAILURE)   //a max amount of 6 processes can be running at any time
   {
-    uint8_t error_buf2[] = "No available processes";
+    uint8_t error_buf2[] = "No available processes\n";
     term_write(1, error_buf2, ERROR_SIZE);
-    return FAILURE;
+    error_flag = 1;
   }
 
 
@@ -188,11 +192,12 @@ int32_t execute(const uint8_t* command)
     if(command[i] ==  ' ')   //space separated command
     {
       len_word1 = i;
+      flag = 1;
       break;
     }
   }
 
-  if(len_word1 == 0)    //there is only one word
+  if(flag == 0)    //there is only one word
   {
     len_word1 = len;
   }
@@ -203,23 +208,22 @@ int32_t execute(const uint8_t* command)
   }
   first_word[len_word1] = '\0'; //add end indentifier
 
-  if(len_word1 < len)   //presumambly not needed but put rest of word into another buffer
+  if(flag == 1)   //presumambly not needed but put rest of word into another buffer
   {
     for(i = len_word1 + 1; i < len; i++)
     {
       rest_of_word[i - len_word1 - 1] = command[i];
     }
-    //rest_of_word[i - len_word1] = '\0';
+    rest_of_word[i - len_word1 - 1] = '\0';
+    PCB_six[c_process_num]->argsize = strlen((int8_t*)rest_of_word);
+
+    for(i = 0; i < PCB_six[c_process_num]->argsize; i++)
+    {
+      PCB_six[c_process_num]->args[i] = rest_of_word[i];
+    }
   }
   //save the entered commandand set argsize
-  printf("word: %s\n", rest_of_word);
-  i=len_word1;
-  while(i<len && i<MAXARGS){
-    PCB_six[c_process_num]->args[i] = rest_of_word[i];
-    i++;
-  }
-  i++;
-  PCB_six[c_process_num]->argsize = i-len_word1;
+
 /*+++++++++++++++++++++++++++++ PART 2: Executable check +++++++++++++++++++++++++++++++++++++++++++++++*/
 
   //check if file name exists
@@ -227,9 +231,9 @@ int32_t execute(const uint8_t* command)
 
   if(check == FAILURE)
   {
-    uint8_t error_buf3[] = "Couldn't find exectuable file";
+    uint8_t error_buf3[] = "Couldn't find exectuable file\n";
     term_write(1, error_buf3, ERROR_SIZE);
-    return FAILURE;
+    error_flag = 1;
   }
 
   //load first 40 bytes into header buffer
@@ -237,9 +241,9 @@ int32_t execute(const uint8_t* command)
 
   if(check == FAILURE)
   {
-    uint8_t error_buf4[] = "Read_data failed";
+    uint8_t error_buf4[] = "Read_data failed\n";
     term_write(1, error_buf4, ERROR_SIZE);
-    return FAILURE;
+    error_flag = 1;
   }
 
 
@@ -247,9 +251,9 @@ int32_t execute(const uint8_t* command)
   if((header[0] != ELF_MAGIC0) || (header[1] != ELF_MAGIC1) ||
      (header[2] != ELF_MAGIC2) || (header[3] != ELF_MAGIC3))
      {
-       uint8_t error_buf5[] = "Not an executable";
+       uint8_t error_buf5[] = "Not an executable\n";
        term_write(1, error_buf5, ERROR_SIZE);
-       return FAILURE;
+       error_flag = 1;
      }
 
 /*+++++++++++++++++++++++++++++ PART 3: Paging +++++++++++++++++++++++++++++++++++++++++++++++*/
@@ -277,9 +281,9 @@ int32_t execute(const uint8_t* command)
 
   if(check == FAILURE)
   {
-    uint8_t error_buf6[] = "Failed to load program";
+    uint8_t error_buf6[] = "Failed to load program\n";
     term_write(1, error_buf6, ERROR_SIZE);
-    return FAILURE;
+    error_flag = 1;
   }
 /*+++++++++++++++++++++++++++++ PART 5: Create PCB +++++++++++++++++++++++++++++++++++++++++++++++*/
 
@@ -313,11 +317,7 @@ for(i = MINFD; i < MAXFILES; i++)
   PCB_six[process_num]->file_array[i].f_pos = 0;
   PCB_six[process_num]->file_array[i].flags = 0;
 }
-//init args array and cnt
-for(i = 0; i<MAXARGS; i++){
-  PCB_six[c_process_num]->args[i] = 0;
-}
-PCB_six[c_process_num]->argsize = 0;
+
 //init default signals
 for(i = 0; i<SIG_CNT; i++){
   PCB_six[c_process_num]->sig_arr[i] = sig_map[i];
@@ -351,7 +351,6 @@ else
   eip_addr = eip_addr | (header[25] << 8);
   eip_addr = eip_addr | header[24];
 
-  uint32_t base, stack;
 
   //store ebp and esp for eventual return to execute from halt
   asm volatile(
@@ -359,10 +358,13 @@ else
     "movl %%ebp, %1\n"
     :"=r"(stack), "=r"(base)
   );
-
   PCB_six[process_num]->ebp = base;
   PCB_six[process_num]->esp = stack;
 
+  if(error_flag == 1)
+  {
+    halt(255);
+  }
   //sti();
   //push iret context
   asm volatile(
@@ -554,16 +556,23 @@ int32_t close(int32_t fd)
 int32_t getargs(uint8_t* buf, int32_t nbytes)
 {
   int32_t i;
+  int32_t len;
   //check for invalis cases (no args, NULL)
   if(buf == NULL || nbytes == 0){
     return -1;
   }
-  i=0;
-  //copy the buf into user mem (i think this is all?)
-  while(i < nbytes && i < PCB_six[c_process_num]->argsize){
+  len = PCB_six[c_process_num]->argsize;
+
+  for(i = 0; i < len; i++)
+  {
     buf[i] = PCB_six[c_process_num]->args[i];
-    i++;
   }
+
+  buf[len] = '\0';
+
+
+  //copy the buf into user mem (i think this is all?)
+
   return 0;
 }
 /*

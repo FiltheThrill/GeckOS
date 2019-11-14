@@ -29,7 +29,7 @@
 #define KEYTEST 0
 #define TERMTEST 0
 #define COMMENTFILETEST 0
-#define VERIFY_VIDMAP 1
+#define VERIFY_VIDMAP 0
 #define MULTI_PROG 0
 #define USER_PROGS 0
 #define GARBAGE 0
