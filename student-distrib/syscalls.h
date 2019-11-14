@@ -11,6 +11,7 @@
 #define SURP    0x09F
 #define MAXPROCESSES  6
 #define MAXFILES    8
+#define MAXARGS  1000 //? arbitrary max length
 #define ELF_MAGIC0 0x7F
 #define ELF_MAGIC1  0x45
 #define ELF_MAGIC2 0x4C
@@ -28,6 +29,11 @@
 #define STDINFD 0
 #define STDOUTFD 1
 #define PAGESIZE 4
+#define VIDMEM_CPY 0x8800000  //address for user vid mem
+#define VIDMEM_START 0x8000000 //address for vidmem start
+#define VIDMEM_END 0x8400000
+#define ATTR_HALT  0x87
+#define SIG_CNT    5
 
 //https://barrgroup.com/Embedded-Systems/How-To/C-Function-Pointers
 typedef struct { //disgusting
@@ -57,6 +63,10 @@ typedef struct PCB_t{
   int32_t index;
   int32_t p_index;
   //ADD STUFF AS YOU SEE FIT I DONT REALLY KNOW WHAT ELSE IS SUPPOSED GO IN HERE
+  uint8_t args[MAXARGS];
+  int32_t argsize;
+  //add for sigs
+  void* sig_arr[SIG_CNT];
 } PCB_t;
 
 PCB_t* PCB_six[6];
@@ -82,5 +92,9 @@ extern int32_t vidmap(uint8_t** screen_start);
 extern int32_t set_handler(int32_t signum, void* handler_address);
 
 extern int32_t sigreturn(void);
+
+extern int32_t kill();
+
+extern int32_t ignore();
 
 #endif

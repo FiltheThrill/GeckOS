@@ -17,8 +17,7 @@ operations_table_t stdout;
 operations_table_t file_table;
 operations_table_t rtc_table;
 operations_table_t directory_table;
-
-
+static void* sig_map[] = {kill,kill,kill,ignore,ignore};
 /*
  * PCB_start
  *   DESCRIPTION: initializes PCB array at bottom of the 4mb kernel stack, each
@@ -37,8 +36,6 @@ void PCB_start()
     PCB_six[i]->process_on = 0;
   }
 }
-
-
 /*
  * halt
  *   DESCRIPTION: system call halt resets the current process's pcb and returns
@@ -52,12 +49,10 @@ int32_t halt(uint8_t status)
 {
   uint32_t esp_ret, ebp_ret;
   int i, root_check = 0;
-//  cli();
   PCB_t* parent = PCB_six[c_process_num]->parent_process;
   esp_ret = PCB_six[c_process_num]->esp;
   ebp_ret = PCB_six[c_process_num]->ebp;
   tss.esp0 = PCB_six[c_process_num]->prev_esp0;
-  //tss.ss0 = PCB_six[c_process_num]->prev_ss0;
 
   if(c_process_num == 0)
   {
@@ -73,6 +68,14 @@ int32_t halt(uint8_t status)
       PCB_six[c_process_num]->file_array[i].f_pos = 0;
       PCB_six[c_process_num]->file_array[i].flags = 0;
     }
+    for(i = 0; i<MAXARGS; i++){
+      PCB_six[c_process_num]->args[i] = 0;
+    }
+    //change back any of the editied handlers
+    for(i = 0; i<SIG_CNT; i++){
+      PCB_six[c_process_num]->sig_arr[i] = sig_map[i];
+    }
+    PCB_six[c_process_num]->argsize = 0;
     PCB_six[c_process_num]->process_on = 0;
     PCB_six[c_process_num]->ebp = 0;
     PCB_six[c_process_num]->esp = 0;
@@ -87,6 +90,8 @@ int32_t halt(uint8_t status)
 
   //update page directory entry
   page_directory[PAGE128] = ((EIGHTMB + (c_process_num * FOURMB)) | SURP);
+
+  //flush tlb
   asm volatile(
     "movl %%cr3, %%eax\n"
     "movl %%eax, %%cr3\n"
@@ -177,6 +182,14 @@ int32_t execute(const uint8_t* command)
 /*+++++++++++++++++++++++++++++ PART 1: Parse Command +++++++++++++++++++++++++++++++++++++++++++++++*/
 
   len = strlen((int8_t*) command);
+
+  //save the entered commandand set argsize
+  i=0;
+  while(i<len && i<MAXARGS){
+    PCB_six[c_process_num]->args[i] = command[i];
+    i++;
+  }
+  PCB_six[c_process_num]->argsize = i;
 
   for(i = 0; i < len; i++)  //find where first word ends
   {
@@ -298,9 +311,16 @@ for(i = MINFD; i < MAXFILES; i++)
   PCB_six[process_num]->file_array[i].inode = -1;
   PCB_six[process_num]->file_array[i].f_pos = 0;
   PCB_six[process_num]->file_array[i].flags = 0;
-
 }
-
+//init args array and cnt
+for(i = 0; i<MAXARGS; i++){
+  PCB_six[c_process_num]->args[i] = 0;
+}
+PCB_six[c_process_num]->argsize = 0;
+//init default signals
+for(i = 0; i<SIG_CNT; i++){
+  PCB_six[c_process_num]->sig_arr[i] = sig_map[i];
+}
 // if this is is our first process make its own parent,
 // otherwise use the last process as parent
 if(process_num == 0)
@@ -521,23 +541,101 @@ int32_t close(int32_t fd)
   PCB_six[c_process_num]->file_array[fd].flags = 0;
   return PCB_six[c_process_num]->file_array[fd].f_op_tbl_ptr->close(fd);
 }
-
+/*
+ * getargs
+ *   DESCRIPTION: system call for taking cmd line args into user level buffer
+ *   INPUTS:  buf - the array in memory where the args are stored
+ *            nbytes - the number of bytes avaliable in the buf
+ *   OUTPUTS: none
+ *   RETURN VALUE: 0 on successful write or -1 on failure
+ *   SIDE EFFECTS: writes to the args array
+ */
 int32_t getargs(uint8_t* buf, int32_t nbytes)
 {
+  int32_t i;
+  //check for invalis cases (no args, NULL)
+  if(buf == NULL || nbytes == 0){
+    return -1;
+  }
+  i=0;
+  //copy the buf into user mem (i think this is all?)
+  while(i < nbytes && i < PCB_six[c_process_num]->argsize){
+    buf[i] = PCB_six[c_process_num]->args[i];
+    i++;
+  }
   return 0;
 }
-
+/*
+ * vidmap
+ *   DESCRIPTION: system call to copy the current vid mem to an address in user space
+ *                This uses a static virtual address defined above
+ *   INPUTS:  screen_start pointer to array of user vid mem
+ *   OUTPUTS: none
+ *   RETURN VALUE: returns the address written to, or -1 if invalid write
+ *   SIDE EFFECTS: writes to the user space vid mem
+ */
 int32_t vidmap(uint8_t** screen_start)
 {
+  int check;
+  uint32_t Vaddr,Paddr;
+  //check for invalid adresses
+  if(screen_start == NULL){
+    return -1;
+  }
+  if((uint32_t)screen_start < VIDMEM_START || (uint32_t)screen_start > VIDMEM_END){
+    return -1;
+  }
+  //utilize static adresses
+  Vaddr = (uint32_t)VIDMEM_CPY;
+  Paddr = (uint32_t)VIDMEM_ADDR;
+  //remap the memory from virtual loc to physical vidmem
+  check = page_to_phys(Vaddr,Paddr);
+  if(check == -1){
+    return -1;
+  }
+  //paging success! set new screen start and return
+  *screen_start = (uint8_t*)VIDMEM_CPY;
+  return VIDMEM_CPY;
+}
+/*
+ * set_handler
+ *   DESCRIPTION: changes the default action taken when a signal is recieved
+ *   INPUTS:  signum - number of the signal to handle
+ *            handler_address - address of the function to use
+ *   OUTPUTS: none
+ *   RETURN VALUE: returns 0 if set, or -1 if set failed
+ *   SIDE EFFECTS: changes default prog operation
+ */
+int32_t set_handler(int32_t signum, void* handler_address)
+{
+  if(signum < 0 || signum > SIG_CNT){
+    return -1;
+  }
+  if(handler_address == NULL){
+    PCB_six[c_process_num]->sig_arr[signum] = sig_map[signum];
+  }
+  else{
+    PCB_six[c_process_num]->sig_arr[signum] = handler_address;
+  }
   return 0;
 }
-
-int32_t set_handler(int32_t signum, void* handler_address)
+/*
+ * sigreturn
+ *   DESCRIPTION: returns from the signal interrupt
+ *   INPUTS:  none
+ *   OUTPUTS: none
+ *   RETURN VALUE: returns
+ *   SIDE EFFECTS: changes default prog operation
+ */
+int32_t sigreturn(void)
 {
   return 0;
 }
-
-int32_t sigreturn(void)
+int32_t kill()
+{
+  return 0;
+}
+int32_t ignore()
 {
   return 0;
 }

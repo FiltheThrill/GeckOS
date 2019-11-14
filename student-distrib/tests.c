@@ -6,6 +6,8 @@
 #include "rtc.h"
 #include "keyboard.h"
 #include "terminal.h"
+#include "syscalls.h"
+
 
 #define INBOUND	0xB8000
 #define OUTBOUND	0x800000
@@ -27,6 +29,10 @@
 #define KEYTEST 0
 #define TERMTEST 0
 #define COMMENTFILETEST 0
+#define VERIFY_VIDMAP 1
+#define MULTI_PROG 0
+#define USER_PROGS 0
+#define GARBAGE 0
 /* format these macros as you see fit */
 #define TEST_HEADER 	\
 	printf("[TEST %s] Running %s at %s:%d\n", __FUNCTION__, __FUNCTION__, __FILE__, __LINE__)
@@ -419,6 +425,36 @@ void term_test(){
 }
 /* Checkpoint 3 tests */
 /* Checkpoint 4 tests */
+void verify_vidmap(){
+	uint8_t** screen_start;
+	uint8_t buf[128] = "takes from correct mem\n";
+	uint8_t buf2[128] = "copied, should be clear!\n";
+	int32_t fd = 0;
+
+	screen_start = 0x7200000;
+
+	if(-1 == vidmap(screen_start)){
+    term_write(fd,buf,128);
+  }
+
+	screen_start = 0x8200000;
+
+	if(0 == vidmap(screen_start)){
+    term_write(fd,buf2,128);
+  }
+}
+
+void multi_prog(){
+
+}
+
+void user_progs(){
+
+}
+
+void garbage(){
+
+}
 /* Checkpoint 5 tests */
 
 
@@ -464,4 +500,17 @@ void launch_tests(){
 	#if (TERMTEST == 1)
 		term_test();
 	#endif
+	#if (VERIFY_VIDMAP == 1)
+		verify_vidmap();
+	#endif
+	#if (USER_PROGS == 1)
+		user_progs();
+	#endif
+	#if (MULTI_PROG == 1)
+		multi_prog();
+	#endif
+	#if (GARBAGE == 1)
+		garbage();
+	#endif
+
 }
