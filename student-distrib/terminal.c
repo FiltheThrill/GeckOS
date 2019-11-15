@@ -6,7 +6,7 @@
 
 volatile unsigned int curterm;            //terminal being used (index)
 volatile unsigned int termnum[TNUM];      //id to correspond with term var
-volatile uint8_t termmem[TNUM];           //vid mem pointers
+volatile uint32_t termmem[TNUM];          //vid mem pointers
 volatile int termpid[TNUM];               //process id given to the terminal
 volatile char termrun[TNUM];              //check if term is active
 
@@ -34,7 +34,7 @@ void term_init(){
   p =0;
   for(i=0;i<TNUM;i++){
     //termmem[i] = paging_terminal(v,p);
-    termmem[i] = 0;
+    termmem[i] = 0xB8000;
   }
   return;
 }

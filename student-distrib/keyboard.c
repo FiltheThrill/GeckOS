@@ -11,6 +11,7 @@ https://wiki.osdev.org/Text_Mode_Cursor
 #include "lib.h"
 #include "types.h"
 #include "terminal.h"
+#include "syscalls.h"
 //globals
 //static vars
 //lowercase translational table with numbers
@@ -37,28 +38,28 @@ static char scancode_caps[] = {0, 0, '1', '2', '3', '4', '5', '6', '7', '8', '9'
                             'V', 'B', 'N', 'M', ',', '.', '/', 0, '*', 0, ' ', 0, 0,
                              0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, '7', '8', '9', '-', '4',
                             '5', '6', '+', '1', '2', '3', '0', '.'};
-//prompt to display in term
-static char prompt[20] = {'[','t','e','r','m',']','>'};
+//cmd prompt to display in term, also default one
+static char prompt[CURSOROFF] = {'3','9','1','O','S','>'};
+//attr for term background color
+static uint8_t attr[TNUM] = {7,6,5};
 //dynamic vars (made volatile to survive running)
 //all keyboard uses for each possible terminal are stored here
-volatile unsigned int term;                   //global for current terminal 0,(1,2,3,4 for multiterm)
+volatile unsigned int term;                      //global for current terminal 0,(1,2,3,4 for multiterm)
 //[ins,alt,caps,ctrl,shift]
-volatile unsigned char ops[OPNUM];            //char arr to store modifiers
-volatile unsigned int cursoff[TNUM];          //used to add terminal prompt
-volatile unsigned int cmd_len[TNUM];          //global for each command length
-volatile char cmd_buf[TNUM][BUFMAX];          //global cmd store for any terminal
-volatile char scr_buf[SCRSIZE];               //stores the whole cur screen to work on
-volatile unsigned int scrcnt;                 //track the # of char input
-volatile int active_ln;                       //current active line being typed on
-volatile int cursorX[TNUM];                   //cursor x val
-volatile int cursorY[TNUM];                   //cursor y val(line num)
-volatile uint8_t attr[TNUM];                  //attributes for console
-volatile uint32_t address[TNUM];               //vid mem pointers
+volatile unsigned char ops[OPNUM];               //char arr to store modifiers
+volatile unsigned int cmd_len[TNUM];             //global for each command length
+volatile char cmd_buf[TNUM][BUFMAX];             //global cmd store for any terminal
+volatile int cmd_start[TNUM];                    //active cmd loc start addr relative to screen
+volatile int cursorX[TNUM];                      //cursor x val
+volatile int cursorY[TNUM];                      //cursor y val(line num)
+volatile uint32_t address[TNUM];                 //vid mem pointers
 //boolean using n or y
-volatile unsigned char termRead[TNUM];        //allow typed term read
+volatile unsigned char termRead[TNUM];           //allow typed term read
+volatile char cmd_flag[TNUM];                    //flag to detect prompt writes
 //extra credit!!
-volatile unsigned int histnum[TNUM];          //cnt for place in hist
-volatile char cmd_hist[TNUM][HISTNUM][BUFMAX];   //allows for cmd history up to a cnt
+volatile int histidx;                            //index in the history buf
+volatile char cmd_hist[HISTNUM][BUFMAX];         //allows for cmd history up to a cnt
+volatile int cmd_hist_len[HISTNUM];              //stores the saved cmd len
 /*
 * keyboard_init
 *   DESCRIPTION: enables irq1 to allow keyboard interrupts
@@ -77,13 +78,11 @@ void keyboard_init(){
   for(i=0;i<TNUM;i++){
     termRead[i] = 'n';
     cmd_len[i] = 0;
+    cmd_flag[i] = 'n';
     cursorX[i] = 0;
     cursorY[i] = 0;
-    histnum[i] = 0;
-    cursoff[i] = CURSOROFF;
-    //change for color?
-    attr[i] = ATTR;
-    address[i] = 0;//term_addr(i);
+    cmd_start[i] = CURSORD;
+    address[i] = term_addr(i);
   }
   //set global cmd bufs
   for(i=0;i<TNUM;i++){
@@ -92,78 +91,28 @@ void keyboard_init(){
       cmd_buf[i][j] = NULLCHAR;
     }
   }
-  //fill cur screen buf
-  for(i=0;i<SCRSIZE;i++){
-    scr_buf[i] = NULLCHAR;
-  }
   //fill ops
   for(i=0;i<5;i++){
     ops[i] = 'n';
   }
   //set global hist
-  for(i=0;i<TNUM;i++){
-    for(j=0;j<HISTNUM;j++){
-      for(k=0;k<BUFMAX;k++){
-        cmd_hist[i][j][k] = NULLCHAR;
-      }
+  for(j=0;j<HISTNUM;j++){
+    for(k=0;k<BUFMAX;k++){
+      cmd_hist[j][k] = NULLCHAR;
     }
+    cmd_hist_len[i] = 0;
   }
   //set term num to first term (0)
   term = 0;
-  scrcnt = 0;
-  active_ln = 0;
-  //enable req and set screen
-  term_clear(term,0);
-  move_cursor(term);
+  histidx = -1;
+  //enable req
   enable_irq(KEYIRQ);
   return;
 }
-//update the current terminal
-//pulls this data from term init
+//updates the term in use
 void update_term(unsigned int t){
   term = t;
 }
-int32_t term_write(int32_t fd, const void * buf, int32_t nbytes){
-  int bytecnt;
-  unsigned int t;
-  char put;
-  //get current terminal
-  t = fetch_process();
-  bytecnt = 0;
-  //shorten to string size
-  if(nbytes > strlen(buf)){
-    nbytes = strlen(buf);
-  }
-  cli();
-  cursorY[t]++;
-  cursorX[t] = 0;
-  //kill if excedes screen size
-  while(bytecnt < nbytes && bytecnt < XMAX * YMAX){
-    //allow new lines
-    if(*((uint8_t *) buf) == '\n'){
-       //cursorX[t] = 0;
-       //cursorY[t]++;
-       term_putc(t, 0);
-       bytecnt++;
-       cursorX[t]++;
-     }
-    else{
-      put = *((uint8_t *) buf);
-      term_putc(t, put);
-      bytecnt++;
-      cursorX[t]++;
-      if(*((uint8_t *) buf) == '>'){
-        //found the cmd prompt
-        cursoff[t] = bytecnt + cursorY[t]*XMAX;
-      }
-    }
-    buf = ((uint8_t *) buf + 1);
-  }
-  move_cursor(t);
-  sti();
-  return bytecnt;
-}
-
 /*
 * term_write
 *   DESCRIPTION: handles system terminal writes, uses the provided
@@ -172,49 +121,67 @@ int32_t term_write(int32_t fd, const void * buf, int32_t nbytes){
 *   OUTPUTS: none
 *   RETURN VALUE: number of bytes written (can vary based on screen size)
 *   SIDE EFFECTS: clears the screen
-
+*/
 int32_t term_write(int32_t fd, const void * buf, int32_t nbytes){
-  int bytecnt;
+  int bytecnt, flag;
   unsigned int t,i;
+  char put;
   //get current terminal
   t = fetch_process();
-  bytecnt = 0;
   //shorten to string size
-  if(nbytes != strlen(buf)){
+  if(nbytes > strlen(buf)){
     nbytes = strlen(buf);
   }
   cli();
-  //kill if excedes screen size
-  while(bytecnt < nbytes && bytecnt < XMAX * YMAX){
-    //allow new lines
+  bytecnt = 0;
+  flag = 0;
+  cmd_flag[t] = 'y';
+  while(bytecnt < nbytes){
+    //allow new lines (or not)
     if(*((uint8_t *) buf) == '\n'){
-      cursorX[t] = 0;
+      bytecnt++;
       cursorY[t]++;
-      active_ln++;
-      for(i=scrcnt;i<XMAX-1;i++){
-        scr_buf[i+scrcnt] = ' ';
-      }
-      scrcnt = scrcnt + i;
+      cursorX[t] = 0;
+      validate_cursor(t);
     }
     else{
-      scr_buf[cursorX[t] + XMAX * active_ln -1] = *((uint8_t *) buf);
-      scrcnt++;
-      term_putc(t, scr_buf[cursorX[t] + XMAX * active_ln -1]);
+      put = *((uint8_t *) buf);
+      term_putc(t, put);
       bytecnt++;
       cursorX[t]++;
       if(*((uint8_t *) buf) == '>'){
-        //found the cmd prompt
-        cursoff[t] = bytecnt + active_ln*XMAX;
+        //found new cmd prompt, update start pos
+        cmd_start[t] = bytecnt + cursorY[t]*XMAX;
+        cmd_flag[t] = 'n';
       }
     }
     buf = ((uint8_t *) buf + 1);
   }
-  //restore cursor and adjust screen
-  move_cursor(t);
-  sti();
+  //prompt found, validate
+  if(cmd_flag[t] == 'n'){
+    cursorX[t]--;
+    move_cursor(t);
+    //bad newln behind prompt, fix
+    if(cursorX[t] > CURSORD){
+      for(i=0; i<CURSORD; i++){
+        cursorX[t]--;
+        term_putc(t, NULLCHAR);
+      }
+      cursorY[t]++;
+      cursorX[t] = 0;
+      validate_cursor(t);
+      for(i=0; i<CURSOROFF; i++){
+        term_putc(t, prompt[i]);
+        cursorX[t]++;
+      }
+      move_cursor(t);
+      cmd_start[t] = cursorX[t] + cursorY[t]*XMAX;
+    }
+    sti();
+  }
   return bytecnt;
 }
-*/
+
 //handles system terminal reads, deletes typed cmd after use
 /*
 * term_reaad
@@ -226,15 +193,22 @@ int32_t term_write(int32_t fd, const void * buf, int32_t nbytes){
 *   SIDE EFFECTS: writes history if desired, clears screen
 */
 int32_t term_read(int32_t fd, void * buf, int32_t nbytes){
-  //start at the cmd
-  unsigned int t = fetch_process();
+  unsigned int t;
   int32_t i,j;
   char c;
-  sti();
-  //wait for command completion (spam?)
-  while(termRead[t] == 'n'){
-    //return 0;
+
+  //check for prev write with no prompt
+  t = fetch_process();
+  if(cmd_flag[t] == 'y'){
+    cmd_start[t] = cursorX[t] + cursorY[t] * XMAX;
+    move_cursor(t);
+    cmd_flag[t] = 'n';
   }
+  sti(); //enable interrupts while wait
+  while(termRead[t] == 'n'){
+    //spin while wait for read
+  }
+  cli();
   //save entered command
   if(USEHIST == 1){
     history_write();
@@ -252,10 +226,10 @@ int32_t term_read(int32_t fd, void * buf, int32_t nbytes){
   for(j=0;j<BUFMAX;j++){
     cmd_buf[t][j] = NULLCHAR;
   }
-
   //reset vals, ret bytes read
   cmd_len[t] = 0;
   termRead[t] = 'n';
+  sti();
   return i;
 }
 /*
@@ -272,7 +246,7 @@ int32_t term_read(int32_t fd, void * buf, int32_t nbytes){
 */
 void keyboard_handler(){
   uint8_t scan;           //scancode
-  int i, ret;          //loop/switch int
+  int i;          //loop/switch int
 
   cli();                  //disable interrupts for now
   asm volatile(
@@ -283,21 +257,22 @@ void keyboard_handler(){
   i = parse_input(scan);         //parse the input
   switch (i)
   {
-    case -1: //added char is inside buf, reprint screen
-      ret = reprint_screen();
-      if(ret == 1){
-      }
+    case -1: //added char is inside buf, reprint buf to term
+      reprint_cmd(term);
       cursorX[term]++;
       move_cursor(term);
       break;
-    case 0:  //write new char at end
-      term_putc(term,scr_buf[scrcnt-1]);
+    case 0:  //add char at end of buf, print new
+      term_putc(term,cmd_buf[term][cmd_len[term]-1]);
       cursorX[term]++;
       move_cursor(term);
       break;
     case 1:  //no new char write, handled in cases
       break;
     case 2:  //stop char encountered, handle
+      cursorY[term]++;
+      cursorX[term] = 0;
+      move_cursor(term);
       break;
     default:
       break;
@@ -320,26 +295,15 @@ void keyboard_handler(){
 *   SIDE EFFECTS: moves the cursor on the display based on the formula to move it
 */
 void move_cursor(unsigned int t){
-  int s;
   uint16_t loc;
-  uint8_t writeL, writeH;
-
-  s = validate_cursor(t);
-  //can't move, handled in validation
-  if(s == 1){
-    return;
-  }
-  loc = cursorY[t] * XMAX;     //iterate the pos down rows
-  loc = loc + cursorX[t];      //add in x vals
-  writeL = loc&0x00FF;         //mask all bits outside of char val
-  writeH = loc&0xFF00;
-  writeH = writeH>>BYTE;
+  //handle screen bounds check
+  validate_cursor(t);
+  loc = cursorY[t] * XMAX + cursorX[t]; //find loc
   //write low bits
-  outb(CURSORLB,CURSORLA);
-  outb(writeL,CURSORHA);
-  //write high bits
-  outb(CURSORHB,CURSORLA);
-  outb(writeH,CURSORHA);
+  outb(C0F,C3D4);
+  outb((uint8_t)(loc& 0xFF),C3D5);
+  outb(C0E,C3D4);
+  outb(((uint8_t)((loc >> BYTE) & 0xFF)),C3D5);
   return;
 }
 /*
@@ -348,11 +312,11 @@ void move_cursor(unsigned int t){
 *     the end in alot of cases, this fixes the coordinate scheme as needed
 *   INPUTS: terminal to operate on
 *   OUTPUTS: none
-*   RETURN VALUE: 0 for allowed move, 1 for not allowed
+*   RETURN VALUE: none
 *   SIDE EFFECTS: changes the values of the cursor globals
 */
-int validate_cursor(uint8_t t){
-  //fix 2d coordinate scheme
+void validate_cursor(uint8_t t){
+  //fix X value coordinate scheme
   while(cursorX[t] >= XMAX){
     cursorY[t]++;
     cursorX[t] = cursorX[t] - XMAX;
@@ -361,25 +325,89 @@ int validate_cursor(uint8_t t){
     cursorY[t]--;
     cursorX[t] = cursorX[t] + XMAX;
   }
-  //dont move out of typed area
-  if(cursorY[t] * XMAX + cursorX[t] > scrcnt){
-    //cursorX[t]--;
-    return 1;
+  if(cursorY[t] < 0){
+    cursorY[t] = 0;
   }
-  //dont move into prompt
-  if(cursorX[t] < cursoff[t] && cursorY[t] == 0){
-    cursorX[t] = cursoff[t];
-    return 1;
-  }
-  //end of screen
+  //end of screen reached (SCROLL!!)
   if(cursorY[t] * XMAX + cursorX[t] >= SCRSIZE){
-    cursorY[t] = YMAX;
-    cursorX[t] = XMAX-1;
+    scroll_screen(t);
+  }
+  return;
+}
+/*
+* validate_move
+*   DESCRIPTION: checks the validity of a given action in the cmd buf
+*   INPUTS: terminal to operate on
+*   OUTPUTS: none
+*   RETURN VALUE: 0 for valid, 1 for invalid
+*   SIDE EFFECTS: none
+*/
+int validate_move(){
+  int32_t idx;
+  //end of screen check
+  idx = 0;
+  while(cursorY[term] * XMAX + cursorX[term] > SCRSIZE-1){
+    idx = 1;
+    cursorX[term]--;
+  }
+  if(idx == 1){
+    move_cursor(term);
+    return 1;
+  }
+  idx = cursorY[term] * XMAX + cursorX[term];
+  idx = idx - cmd_start[term];
+  //check start and end of buf
+  if(idx < 0){
+    cursorX[term]++;
+    return 1;
+  }
+  if(idx > cmd_len[term]){
+    cursorX[term]--;
     return 1;
   }
   return 0;
 }
-//ret 0 for char wrote, 1 for non char write input, 2 for stop input
+/*
+* scroll_screen
+*   DESCRIPTION: scrolls the given terminal, shifts up mem
+*   INPUTS: t - term to scroll
+*   OUTPUTS: none
+*   RETURN VALUE: none
+*   SIDE EFFECTS: edits the contents of term vid mem
+*/
+void scroll_screen(unsigned int t){
+  int x,y;
+  char c[XMAX];
+  uint8_t attr[XMAX];
+
+  cli();
+  //iterate over the rows and move them one up
+  for(y=1;y<YMAX;y++){
+    //load the lower row
+    for(x=0;x<XMAX;x++){
+      c[x] = *(uint8_t *)(address[t] + ((XMAX * y + x) << 1));
+      attr[x] = *(uint8_t *)(address[t] + ((XMAX * y + x) << 1) + 1);
+    }
+    //copy to above
+    for(x=0;x<XMAX;x++){
+      *(uint8_t *)(address[t] + ((XMAX * (y-1) + x) << 1)) = c[x];
+      *(uint8_t *)(address[t] + ((XMAX * (y-1) + x) << 1) + 1) = attr[x];
+    }
+  }
+  //clear bottom line
+  for(x=0;x<XMAX;x++){
+    *(uint8_t *)(address[t] + ((XMAX * (YMAX-1) + x) << 1)) = NULLCHAR;
+    *(uint8_t *)(address[t] + ((XMAX * (YMAX-1) + x) << 1) + 1) = attr[x];
+  }
+  //rectify cursor and shift cmd_start up
+  cursorX[t] = 0;
+  cursorY[t] = YMAX-1;
+  cmd_start[t] = cmd_start[t] - XMAX;
+  reprint_cmd(t);
+  sti();
+  move_cursor(t);
+  return;
+}
 /*
 * parse_input
 *   DESCRIPTION: uses many helper functions to take a scancode and perform the
@@ -391,7 +419,7 @@ int validate_cursor(uint8_t t){
 *   SIDE EFFECTS: could write to buffer or update ops
 */
 int parse_input(uint8_t scancode){
-  int ret, idx;
+  int ret;
   char c;
 
   //update the ops
@@ -417,14 +445,13 @@ int parse_input(uint8_t scancode){
     //was a special char, handled
     return ret;
   }
-  //needs to be written, insert to build buf and ret char
-  idx = cursorY[term] * XMAX + cursorX[term];
-  ret = insert_char(c,idx);
+  //needs to be written, insert to cmd_buf
+  ret = insert_char(c);
   return ret;
 }
 /*
 * process_char
-*   DESCRIPTION: takes a char val and uses it to do any needed commands
+*   DESCRIPTION: takes an ascii char val and uses it to do any needed commands
 *     based on ops (ex: CTRL+L)
 *   INPUTS: char to process
 *   OUTPUTS: none
@@ -432,38 +459,27 @@ int parse_input(uint8_t scancode){
 *   SIDE EFFECTS: can move the cursor or allow term read
 */
 int process_char(char c){
-  int i,ret,idx,full;
+  int i,ret,full;
   static unsigned int pow[7] = {1,2,4,8,16,32,64};
 
   switch(c)
   {
     case ENTER:  //enter
-      //fill_cmdbuf();
-      for(i=0;i<scrcnt;i++){
-        cmd_buf[term][i] = scr_buf[i];
-        scr_buf[i] = 0;
-      }
-      scrcnt =0;
       termRead[term] = 'y';
       return 2;
     case BACKSPACE: //backspace
       cursorX[term]--;
-      idx = cursorY[term] * XMAX + cursorX[term];
-      ret = remove_char(idx);
-      if(ret == 1){
-        cursorX[term]++;
-        return 1;
-      }
-      //backspace is inside buffer
-      if(ret == -1){
-        ret = reprint_screen();
-        if(ret == 1){
-          move_cursor(term);
+      ret = validate_move();
+      if(ret == 0){
+        full = remove_char();
+        if(full == -1){
+          reprint_cmd(term);
         }
-        return 1;
+        if(full == 0){
+          term_putc(term,' ');
+        }
+        move_cursor(term);
       }
-      term_putc(term,NULLCHAR);
-      move_cursor(term);
       return 1;
     case CTRL_L:  //CTRL + l
       if(ops[1] == 'y'){
@@ -472,6 +488,12 @@ int process_char(char c){
         return 1;
       }
       break;
+    case CTRL_C:  //CTRL + c
+      if(ops[1] == 'y'){
+        term_clear(term,-1);
+        kill();
+        return 1;
+      }
     default:
       break;
   }
@@ -500,124 +522,111 @@ int process_char(char c){
   return 1;
 }
 /*
-* reprint_screen
-*   DESCRIPTION: reprints the whole screen for char edits inside scr_buf. avoids
+* reprint_cmd
+*   DESCRIPTION: reprints the whole buf for char edits inside cmd_buf. avoids
 *     messing up the cursor loc while using putc
-*   INPUTS: none
+*   INPUTS: t - term to write to
 *   OUTPUTS: none
 *   RETURN VALUE: returns 1 on completion
 *   SIDE EFFECTS: none
 */
-int reprint_screen(){
+void reprint_cmd(uint8_t t){
   int tempX, tempY, i;
-  //save current cursor loc
-  tempX = cursorX[term];
-  tempY = cursorY[term];
-  cursorX[term] = 0;
-  cursorY[term] = 0;
-  i=0;
-  while(i<SCRSIZE && scr_buf[i] != NULLCHAR){
-    term_putc(term,scr_buf[i]);
-    i++;
-    cursorX[term]++;
+
+  if(cmd_len[t] == 0){
+    return;
   }
-  //clean any deleted char
-  term_putc(term,NULLCHAR);
+  if(cmd_start[t]+BUFMAX >= SCRSIZE){
+    validate_cursor(t);
+  }
+  //save current cursor loc
+  tempX = cursorX[t];
+  tempY = cursorY[t];
+  //check for vals on next line
+  cursorX[t] = cmd_start[t];
+  cursorY[t] = 0;
+  //print the buf, overwrite any old vals
+  for(i=0; i<BUFMAX; i++){
+    term_putc(t,cmd_buf[t][i]);
+    cursorX[t]++;
+  }
   //restore cursor
-  cursorX[term] = tempX;
-  cursorY[term] = tempY;
-  return 1;
+  cursorX[t] = tempX;
+  cursorY[t] = tempY;
+  move_cursor(t);
+  return;
 }
 /*
 * remove_char
 *   DESCRIPTION: removes char from idx in buffer. This can be done at any index
 *     with the buffer being adjusted accordingly.
-*   INPUTS: character to insert, index to insert at
+*   INPUTS: none
 *   OUTPUTS: none
-*   RETURN VALUE: returns 1 if no removal, 0 if removed, -1 if not removed in buf
+*   RETURN VALUE: returns 1 if no action, 0 if removed from end, -1 if removed in buf
 *   SIDE EFFECTS: will adjust the cmd_buf and the lenght of the cmd
 */
-int remove_char(int idx){
-  int i;
-  if(idx < cursoff[term] || idx > SCRSIZE){
+int remove_char(){
+  int i,idx;
+
+  idx = cursorY[term] * XMAX + cursorX[term];
+  idx = idx - cmd_start[term];
+
+  if(idx < 0 || idx > BUFMAX){
     return 1;
   }
-  if(scrcnt == 0){
+  if(cmd_len[term] == 0){
     return 1;
   }
-  scrcnt--;
+  cmd_len[term]--;
   //remove at end of string
-  if(idx == scrcnt){
-    scr_buf[scrcnt] = NULLCHAR;
+  if(idx == cmd_len[term]){
+    cmd_buf[term][idx] = NULLCHAR;
     return 0;
   }
-  if(idx < 0){
-    idx = 0;
-  }
   //rm is in buffer, shift down
-  for(i=idx;i<scrcnt;i++){
-    scr_buf[i] = scr_buf[i+1];
+  for(i=idx;i<BUFMAX;i++){
+    cmd_buf[term][i] = cmd_buf[term][i+1];
   }
-  scr_buf[scrcnt] = NULLCHAR;
+  cmd_buf[term][i] = NULLCHAR;
   return -1;
 }
 /*
 * insert_char
 *   DESCRIPTION: inserts char to screen buffer. This can be done at any index
 *     with the buffer being adjusted accordingly
-*   INPUTS: character to insert, index to insert at
+*   INPUTS: character to insert
 *   OUTPUTS: none
 *   RETURN VALUE: returns 1 if no insert, 0 if inserted, -1 if insert inside buf
 *   SIDE EFFECTS: will adjust the cmd_buf and the lenght of the cmd
 */
-int insert_char(char c, int idx){
+int insert_char(char c){
   char temp;
-  int i,j;
+  int i,idx;
 
-  //simple char instert
-  scr_buf[scrcnt] = c;
-  scrcnt++;
-  return 0;
+  idx = cursorY[term] * XMAX + cursorX[term];
+  idx = idx - cmd_start[term];
   //check for invalid insert idx
-  if(idx < 0){
-    return 1;
-  }
-  if(idx > scrcnt){
+  if(idx < 0 || idx > BUFMAX-1){
     return 1;
   }
   //apped char at end of buf
-  if(idx == scrcnt){
-    scr_buf[scrcnt] = c;
-    scrcnt++;
+  if(idx == cmd_len[term]){
+    cmd_buf[term][idx] = c;
+    cmd_len[term]++;
     return 0;
-  }
-  //scroll if needed
-  if(idx > SCRSIZE-1){
-    for(i=1;i<YMAX;i++){
-      for(j=0;j<XMAX;){
-        scr_buf[(i-1)*XMAX + j] = scr_buf[(i)*XMAX + j];
-      }
-    }
-    for(j=0;j<XMAX;j++){
-      scr_buf[(YMAX-1)*XMAX + j] = NULLCHAR;
-    }
-    scr_buf[(YMAX-1)*XMAX] = c;
-    scrcnt = scrcnt - XMAX;
-    scrcnt++;
-    return -1;
   }
   //insert if toggled on
   if(ops[4] == 'y'){
-    scr_buf[idx] = c;
+    cmd_buf[term][idx] = c;
     return -1;
   }
   //insert is inside buf, shift the content after up by 1
-  for(i=scrcnt;i>idx;i--){
-    temp = scr_buf[i-1];
-    scr_buf[i] = temp;
+  for(i=cmd_len[term];i>idx;i--){
+    temp = cmd_buf[term][i-1];
+    cmd_buf[term][i] = temp;
   }
-  scr_buf[idx] = c;
-  scrcnt++;
+  cmd_buf[term][idx] = c;
+  cmd_len[term]++;
   return -1;
 }
 /*
@@ -629,27 +638,41 @@ int insert_char(char c, int idx){
 *   SIDE EFFECTS: can move the cursor or clear the screen in some cases
 */
 int process_media(uint8_t scancode){
-  int i;
+  int ret;
   switch(scancode)
   {
     case UPARW:  //up arrow
       if(USEHIST == 1){
-        history_fetch(term);
-        i=0;
-        term_clear(term,1);
-        move_cursor(term);
-        return 2;
+        histidx++;
+        ret = history_fetch(term);
+        if(ret == 0){
+          reprint_cmd(term);
+          move_cursor(term);
+        }
       }
       return 1;
     case LEFTARW: //left arrow
       cursorX[term]--;
+      validate_move();
       move_cursor(term);
       return 1;
     case RIGHTARW: //right arrow
       cursorX[term]++;
+      validate_move();
       move_cursor(term);
       return 1;
     case DOWNARW: //down arrow
+    if(USEHIST == 1){
+        histidx--;
+        ret = history_fetch(term);
+        if(ret == 0){
+          reprint_cmd(term);
+          move_cursor(term);
+        }
+      }
+      return 1;
+    case TAB: //tab key
+      auto_comp();
       return 1;
     default:
       return 0;
@@ -784,66 +807,52 @@ char generate_char(uint8_t scancode){
   }
 }
 /*
-* fill_cmdbuf
-*   DESCRIPTION: used the scr_buf to fill the cmd_buf
-*   INPUTS: none
-*   OUTPUTS: none
-*   RETURN VALUE: none
-*   SIDE EFFECTS: fills the command buffer
-*/
-void fill_cmdbuf(){
-  int i,j;
-  j = 0;
-  i=cursoff[term] + XMAX * active_ln;
-  //write from the startpos to the cmd_buf
-  while(j<BUFMAX && scr_buf[i] != NULLCHAR){
-    cmd_buf[term][j] = scr_buf[i];
-    i++;
-    j++;
-  }
-  return;
-}
-/*
-* print_prompt
-*   DESCRIPTION: print the prompt on a given line
-*   INPUTS: none
-*   OUTPUTS: none
-*   RETURN VALUE: none
-*   SIDE EFFECTS: prints the current prompt
-*/
-void print_prompt(){
-  int i;
-  for(i=0;i<cursoff[term];i++){
-    term_putc(term,prompt[i]);
-    scr_buf[cursorX[term]] = prompt[i];
-    cursorX[term]++;
-    scrcnt++;
-  }
-}
-/*
 * history_fetch
 *   DESCRIPTION: change over current term buffer to history and displays
-*   INPUTS: idx of the buffer to fetch from
+*   INPUTS: none
 *   OUTPUTS: none
-*   RETURN VALUE: none
+*   RETURN VALUE: 0 for swap, 1 for no action
 *   SIDE EFFECTS: swaps in the buffered command from history
 */
-void history_fetch(int idx){
+int history_fetch(){
+  unsigned int i;
+  char c;
+
   if(USEHIST == 0){
-    //do nothing
-    return;
+    return 1;
   }
-  unsigned int i, size;
-  size = 0;
-  //move command to active array and set helpers accordingly
-  for(i=0;i<BUFMAX;i++){
-    unsigned char c = cmd_hist[term][i][idx];
-    cmd_buf[term][i] = c;
-    if(c != 0){
-      size++;
+  //check for invalid access
+  if(histidx < -1){
+    histidx = -1;
+    return 1;
+  }
+  if(histidx >= HISTNUM){
+    histidx = HISTNUM-1;
+    return 1;
+  }
+  //base, blank cmd
+  if(histidx == -1){
+    for(i=0;i<BUFMAX;i++){
+      cmd_buf[term][i] = NULLCHAR;
     }
+    cmd_len[term] = 0;
+    return 0;
   }
-  cmd_len[term] = size;
+  //check for history at idx
+  if(cmd_hist_len[histidx] == 0){
+    histidx--;
+    return 1;
+  }
+  //move command to cmd_buf and set helpers accordingly
+  for(i=0;i<BUFMAX;i++){
+    c = cmd_hist[histidx][i];
+    cmd_buf[term][i] = c;
+  }
+  cmd_len[term] = cmd_hist_len[histidx];
+  cursorY[term] = 0;
+  cursorX[term] = cmd_len[term] + cmd_start[term];
+  validate_cursor(term);
+  return 0;
 }
 /*
 * history_write
@@ -856,23 +865,131 @@ void history_fetch(int idx){
 void history_write(){
   int i,j;
   if(USEHIST == 0){
-    //do nothing
     return;
   }
   for(i=0;i<HISTNUM-1;i++){
-    //dont waste effort on usless transfer
-    if(cmd_hist[term][i][0] != 0){
-      j=0;
-      while(j<BUFMAX && cmd_hist[term][i][j] != 0){
-        cmd_hist[term][i+1][j] = cmd_hist[term][i][j];
-        j++;
-      }
+    for(j=0;j<BUFMAX;j++){
+      cmd_hist[i+1][j] = cmd_hist[i][j];
     }
+    cmd_hist_len[i+1] = cmd_hist_len[i];
   }
   //store most recent cmd
   for(i=0;i<BUFMAX;i++){
-    cmd_hist[term][0][i] = cmd_buf[term][i];
+    cmd_hist[0][i] = cmd_buf[term][i];
   }
+  cmd_hist_len[0] = cmd_len[term];
+  return;
+}
+/*
+* auto_comp
+*   DESCRIPTION: writes an auto completed word to the cmd_buf based on file data
+*   INPUTS: none
+*   OUTPUTS: none
+*   RETURN VALUE: none
+*   SIDE EFFECTS: changed the contents of the cmd_buf
+*/
+void auto_comp(){
+  uint8_t buf[SBUF];
+  uint8_t argbuf[SBUF];
+  uint8_t sbuf[2048];
+  uint32_t sidx[200];
+  char hit[200];
+  int32_t cnt, fd, i, j, key;
+  int32_t tot, fcnt, charcnt;
+  char c;
+
+  i=0;
+  cnt=0;
+  //find most recent space for next arg
+  while(i<BUFMAX && i<cmd_len[term]){
+    if(cmd_buf[term][i] == ' '){
+      cnt = i;
+    }
+    i++;
+  }
+  if(cnt < 1 || cnt == cmd_len[term]-1){
+    return; //return if no useful
+  }
+  key = cnt+1;
+  //get rest of arg and count it
+  charcnt = 0;
+  for(i=cnt;i<cmd_len[term];i++){
+    argbuf[charcnt] = cmd_buf[term][i];
+    charcnt++;
+  }
+  //open dir
+  fd = open((uint8_t*)".");
+  if(fd == -1){
+    return;
+  }
+  //get file count and load array
+  cnt = 1;
+  tot = 0;
+  fcnt = 0;
+  while (0 != (cnt = read(fd,buf,SBUF-1))){
+    sidx[fcnt] = tot;
+    for(i=0;i<cnt;i++){
+      sbuf[tot] = buf[i];
+      tot++;
+    }
+    fcnt++;
+  }
+  sidx[fcnt] = tot - sidx[fcnt-1];
+  close(fd);
+  //parse the chars
+  for(i=0;i<fcnt;i++){
+    hit[i] = 'y';
+  }
+  for(i=0;i<charcnt;i++){
+    c = argbuf[i];
+    for(j=0;j<fcnt;j++){
+      //out of chars
+      if(sidx[j]+i >= sidx[j+1]){
+        hit[j] = 'n';
+      }
+      if(c != sbuf[sidx[j]+i]){
+        hit[j] = 'n';
+      }
+      tot = 0;
+      for(cnt=0;cnt<fcnt;cnt++){
+        if(hit[cnt] == 'y'){
+          tot++;
+        }
+      }
+      if(tot == 1){
+        break;
+      }
+    }
+  }
+  //more than one match
+  tot = 0;
+  for(cnt=0;cnt<fcnt;cnt++){
+    if(hit[cnt] == 'y'){
+      tot++;
+    }
+  }
+  if(tot != 1){
+    return;
+  }
+  //found a match!!!
+  cursorX[term] = cursorX[term] - charcnt;
+  for(i=0;i<fcnt;i++){
+    if(hit[i] == 'y'){
+      tot = i;
+      break;
+    }
+  }
+  cnt = 0;
+  j = key;
+  for(i=sidx[tot];i<sidx[tot+1];i++){
+    cmd_buf[term][j] = sbuf[i];
+    j++;
+    cnt++;
+    cursorX[term]++;
+  }
+  cmd_len[term] = key+cnt;
+  reprint_cmd(term);
+  move_cursor(term);
   return;
 }
 //function to get the process id in order to do sys calls
@@ -887,7 +1004,6 @@ unsigned int fetch_process(){
   //return the term for now
   return id;
 }
-//
 /*
 * term_putc
 *   DESCRIPTION: puts char at loc based on given cursor loc. works much
@@ -899,12 +1015,12 @@ unsigned int fetch_process(){
 *   SIDE EFFECTS: will add a char in the idex of the memory location desired
 */
 void term_putc(unsigned int t, uint8_t c){
-  //do same as putc
-  if(USEPAGE == 0){
+  //do same as reg putc buf with my vars
+  if(MULTITERM == 0){
     //use standard vmem address
     address[t] = 0xB8000;
   }
-  if(cursorY[t] * XMAX + cursorX[t] > XMAX*YMAX){
+  if(cursorY[t] * XMAX + cursorX[t] > SCRSIZE){
     return;
   }
   *(uint8_t *)(address[t] + ((XMAX * cursorY[t] + cursorX[t]) << 1)) = c;
@@ -922,47 +1038,50 @@ void term_putc(unsigned int t, uint8_t c){
 *     can also write to this memory after clear
 */
 void term_clear(unsigned int t, int op){
-  int cnt, i;
+  int i;
 
   //do reg clear if not paging
-  if(USEPAGE == 0){
+  if(MULTITERM == 0){
     clear();
   }
   //modify given clear, blank vid mem
   else{
-    for (i = 0; i < SCRSIZE-1; i++) {
+    for (i = 0; i < SCRSIZE; i++) {
         *(uint8_t *)(address[t] + (i << 1)) = ' ';
         *(uint8_t *)(address[t] + (i << 1) + 1) = attr[t];
     }
   }
-  //clear the scr_buf
-  for(i=0;i<SCRSIZE;i++){
-    scr_buf[i] = NULLCHAR;
-  }
-  active_ln = 0;
-  scrcnt = 0;
+  cmd_start[t] = CURSOROFF;
   cursorX[t] = 0;
   cursorY[t] = 0;
-  //print prompt and start screen buf fill
-  for(i=0;i<cursoff[term];i++){
-    term_putc(t,prompt[i]);
-    scr_buf[cursorX[t]] = prompt[i];
-    cursorX[t]++;
-    scrcnt++;
+  //full clear
+  if(op == -1){
+    for(i=0;i<BUFMAX;i++){
+      cmd_buf[t][i] = NULLCHAR;
+    }
+    cmd_len[t] = 0;
+    return;
   }
-  //caller chose to add cmd buffer to screen
+  //print prompt and start screen buf fill
+  for(i=0;i<cmd_start[t];i++){
+    term_putc(t,prompt[i]);
+    cursorX[t]++;
+  }
+  //caller chose to add cmd buffer back to screen
   if(op == 1){
-    cnt = 0;
-    while(cnt < BUFMAX && cmd_buf[t][cnt] != 0){
-      term_putc(t,cmd_buf[t][cnt]);
-      scr_buf[cursorX[t]] = cmd_buf[t][cnt];
-      scrcnt++;
+    for(i=0; i<cmd_len[term]; i++){
+      term_putc(t,cmd_buf[t][i]);
       cursorX[t]++;
-      cnt++;
     }
   }
+  //clear the cmd_buf
+  else{
+    for(i=0;i<BUFMAX;i++){
+      cmd_buf[t][i] = NULLCHAR;
+    }
+    cmd_len[t] = 0;
+  }
   //iterate cursor past added chars
-  cursorX[t]++;
   move_cursor(t);
   return;
 }

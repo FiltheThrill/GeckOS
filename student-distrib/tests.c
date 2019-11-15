@@ -29,7 +29,7 @@
 #define KEYTEST 0
 #define TERMTEST 0
 #define COMMENTFILETEST 0
-#define VERIFY_VIDMAP 1
+#define VERIFY_VIDMAP 0
 #define MULTI_PROG 0
 #define USER_PROGS 0
 #define GARBAGE 0
@@ -408,7 +408,6 @@ int rtc_tests()
 
 //blank handler to allow for typing
 void key_test(){
-	term_clear(0,0);
 	return;
 }
 
@@ -431,13 +430,13 @@ void verify_vidmap(){
 	uint8_t buf2[128] = "copied, should be clear!\n";
 	int32_t fd = 0;
 
-	screen_start = 0x7200000;
+	screen_start = (uint8_t**)0x7200000;
 
 	if(-1 == vidmap(screen_start)){
     term_write(fd,buf,128);
   }
 
-	screen_start = 0x8200000;
+	screen_start = (uint8_t**)0x8200000;
 
 	if(0 == vidmap(screen_start)){
     term_write(fd,buf2,128);

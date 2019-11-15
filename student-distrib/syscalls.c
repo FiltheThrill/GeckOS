@@ -212,7 +212,6 @@ int32_t execute(const uint8_t* command)
     //rest_of_word[i - len_word1] = '\0';
   }
   //save the entered commandand set argsize
-  printf("word: %s\n", rest_of_word);
   i=len_word1;
   while(i<len && i<MAXARGS){
     PCB_six[c_process_num]->args[i] = rest_of_word[i];
@@ -634,6 +633,8 @@ int32_t sigreturn(void)
 }
 int32_t kill()
 {
+  halt(c_process_num);
+  sti();
   return 0;
 }
 int32_t ignore()
