@@ -223,7 +223,6 @@ int32_t execute(const uint8_t* command)
     }
   }
   //save the entered commandand set argsize
-<<<<<<< HEAD
   i=len_word1;
   while(i<len && i<MAXARGS){
     PCB_six[c_process_num]->args[i] = rest_of_word[i];
@@ -231,9 +230,6 @@ int32_t execute(const uint8_t* command)
   }
   i++;
   PCB_six[c_process_num]->argsize = i-len_word1;
-=======
-
->>>>>>> f263945f07c7d64f4dce3eed75c8f9675eda8f5a
 /*+++++++++++++++++++++++++++++ PART 2: Executable check +++++++++++++++++++++++++++++++++++++++++++++++*/
 
   //check if file name exists
@@ -608,7 +604,7 @@ int32_t vidmap(uint8_t** screen_start)
   //utilize static adresses
   Vaddr = (uint32_t)VIDMEM_CPY;
   Paddr = (uint32_t)VIDMEM_ADDR;
-  //remap the memory from virtual loc to physical vidmem
+  //remap the memory from virtual loc to physical vidmems
   check = page_to_phys(Vaddr,Paddr);
   if(check == -1){
     return -1;

@@ -47,7 +47,7 @@
 #define CTRLO       0x9D
 #define ALTO        0xB9
 #define TAB         0x0F
-//externals
+//external
 extern void keyboard_init();
 extern void update_term(unsigned int term);
 extern void keyboard_handler();

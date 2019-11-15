@@ -605,7 +605,7 @@ int insert_char(char c){
 
   idx = cursorY[term] * XMAX + cursorX[term];
   idx = idx - cmd_start[term];
-  //check for invalid insert idx
+  //check for invalid insert idx e
   if(idx < 0 || idx > BUFMAX-1){
     return 1;
   }

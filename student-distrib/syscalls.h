@@ -34,7 +34,7 @@
 #define VIDMEM_END 0x8400000
 #define ATTR_HALT  0x87
 #define SIG_CNT    5
-
+//
 //https://barrgroup.com/Embedded-Systems/How-To/C-Function-Pointers
 typedef struct { //disgusting
   int32_t (*read)(int32_t, void*, int32_t); //int32_t fd, uint8_t * buf, int32_t nbytes
