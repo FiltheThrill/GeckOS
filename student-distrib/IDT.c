@@ -24,8 +24,7 @@ void invalid_tss(){exceptions(10);}
 void seg_not_present(){exceptions(11);}
 void stack_seg_fault(){exceptions(12);}
 void general_protection(){exceptions(13);}
-void page_fault(){
-  exceptions(14);}
+void page_fault(){exceptions(14);}
 void reserved0(){exceptions(15);}
 void floating_point(){exceptions(16);}
 void alignment_check(){exceptions(17);}
@@ -56,10 +55,12 @@ void reserved10(){exceptions(31);}
 void exceptions(int exception_num)
 {
   //clear();
+  int page_flag = 0;
   switch(exception_num)
   {
     case 0:
       printf("Divide By Zero Error Exception \n");
+      page_flag = 1;
       break;
 
     case 1:
@@ -116,6 +117,7 @@ void exceptions(int exception_num)
 
     case 14:
       printf("Page Fault Exception \n");
+      page_flag = 1;
       break;
 
     case 15:
@@ -189,6 +191,7 @@ void exceptions(int exception_num)
 
   exception_flag = 1;
   while(1){}
+
 }
 
 /*

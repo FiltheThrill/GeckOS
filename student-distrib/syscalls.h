@@ -93,7 +93,7 @@ extern int32_t set_handler(int32_t signum, void* handler_address);
 
 extern int32_t sigreturn(void);
 
-extern int32_t kill();
+extern void kill();
 
 extern int32_t ignore();
 

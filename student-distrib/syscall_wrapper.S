@@ -1,28 +1,8 @@
 .data
-ONE = 1   # because some TA's lack braincells and
-TEN = 10  # think any random number is a magic number
 NEGONE = -1
 
 .text
 .globl syscall_handler
-.globl fake_iret
-
-fake_iret:
-  cli
-
-  pushl $0x2b
-
-  pushl 8(%ebp)
-
-  pushf
-  pop %eax
-  or $0x200, %eax
-  push %eax
-
-  pushl $0x23
-
-  pushl 4(%ebp)
-  iret
 
 syscall_handler:
     # movl %eax, %eax

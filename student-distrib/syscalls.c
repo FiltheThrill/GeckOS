@@ -10,6 +10,7 @@ Author - who even cares anymore*/
 #include "paging.h"
 #include "x86_desc.h"
 #include "rtc.h"
+#include "IDT.h"
 
 
 operations_table_t stdin;
@@ -35,6 +36,38 @@ void PCB_start()
     PCB_six[i] = (PCB_t*)(EIGHTMB - ((i + 1) * EIGHTKB));
     PCB_six[i]->process_on = 0;
   }
+
+  //setup stdin operations table
+  stdin.read = &term_read;
+  stdin.write = 0;
+  stdin.open = &term_open;
+  stdin.close = &term_close;
+
+  //setup stdout operations table
+  stdout.read = 0;
+  stdout.write = &term_write;
+  stdout.open = &term_open;
+  stdout.close = &term_close;
+
+  //setup function jump table for rtc
+  rtc_table.read = &rtc_read;
+  rtc_table.write = &rtc_write;
+  rtc_table.open = &rtc_open;
+  rtc_table.close = &rtc_close;
+
+  //setup function jump table for directory
+  directory_table.read = &dread;
+  directory_table.write = &dwrite;
+  directory_table.open = &dopen;
+  directory_table.close = &dclose;
+
+  //setup function jupm table for file
+  file_table.read = &fread;
+  file_table.write = &fwrite;
+  file_table.open = &fopen;
+  file_table.close = &fclose;
+
+  return;
 }
 /*
  * halt
@@ -117,7 +150,7 @@ int32_t halt(uint8_t status)
       :
       :"b"(ebp_ret)
     );
-//leave and return to execute
+//leave and return "from"" execute
   asm volatile(
     "leave\n"
     "ret"
@@ -153,10 +186,7 @@ int32_t execute(const uint8_t* command)
   {
     uint8_t error_buf1[] = "Invalid cmd";
     term_write(1, error_buf1, ERROR_SIZE);
-    PCB_six[process_num]->ebp = base;
-    PCB_six[process_num]->esp = stack;
-    halt(255);
-    return FAILURE;
+    error_flag = 1;
   }
 
   check = FAILURE;
@@ -293,18 +323,6 @@ int32_t execute(const uint8_t* command)
   }
 /*+++++++++++++++++++++++++++++ PART 5: Create PCB +++++++++++++++++++++++++++++++++++++++++++++++*/
 
-//setup stdin operations table
-stdin.read = &term_read;
-stdin.write = 0;
-stdin.open = &term_open;
-stdin.close = &term_close;
-
-//setup stdout operations table
-stdout.read = 0;
-stdout.write = &term_write;
-stdout.open = &term_open;
-stdout.close = &term_close;
-
 //load stdin and stdout into filearray 0 and 1 respectively
 PCB_six[process_num]->file_array[0].f_op_tbl_ptr = &stdin;
 PCB_six[process_num]->file_array[1].f_op_tbl_ptr = &stdout;
@@ -421,8 +439,6 @@ int32_t read(int32_t fd, void* buf, int32_t nbytes)
  */
 int32_t write(int32_t fd, const void* buf, int32_t nbytes)
 {
-
-  //cli();
   if((fd <= STDINFD) || (fd > MAXFD) || (PCB_six[c_process_num]->file_array[fd].flags == 0))
   {
     return 0;
@@ -482,12 +498,7 @@ switch(type)
   {
     case RTC:
 
-      //setup function jump table for rtc
-      rtc_table.read = &rtc_read;
-      rtc_table.write = &rtc_write;
-      rtc_table.open = &rtc_open;
-      rtc_table.close = &rtc_close;
-
+      //assign table
       PCB_six[c_process_num]->file_array[idx].f_op_tbl_ptr = &rtc_table;
 
       //use rtc open
@@ -495,12 +506,7 @@ switch(type)
        return idx;
     case DIRECTORY:
 
-      //setup function jump table for directory
-      directory_table.read = &dread;
-      directory_table.write = &dwrite;
-      directory_table.open = &dopen;
-      directory_table.close = &dclose;
-
+      //assign table
       PCB_six[c_process_num]->file_array[idx].f_op_tbl_ptr = &directory_table;
 
       //use directory open
@@ -509,12 +515,7 @@ switch(type)
 
     case FILE:
 
-      //setup function jupm table for file
-      file_table.read = &fread;
-      file_table.write = &fwrite;
-      file_table.open = &fopen;
-      file_table.close = &fclose;
-
+      //assign tables
       PCB_six[c_process_num]->file_array[idx].f_op_tbl_ptr = &file_table;
 
       //load in inode #
@@ -567,6 +568,7 @@ int32_t getargs(uint8_t* buf, int32_t nbytes)
   if(buf == NULL || nbytes == 0){
     return -1;
   }
+
   len = PCB_six[c_process_num]->argsize;
 
   for(i = 0; i < len; i++)
@@ -575,9 +577,6 @@ int32_t getargs(uint8_t* buf, int32_t nbytes)
   }
 
   buf[len] = '\0';
-
-
-  //copy the buf into user mem (i think this is all?)
 
   return 0;
 }
@@ -595,10 +594,8 @@ int32_t vidmap(uint8_t** screen_start)
   int check;
   uint32_t Vaddr,Paddr;
   //check for invalid adresses
-  if(screen_start == NULL){
-    return -1;
-  }
-  if((uint32_t)screen_start < VIDMEM_START || (uint32_t)screen_start > VIDMEM_END){
+  if((uint32_t)screen_start < VIDMEM_START || (uint32_t)screen_start > VIDMEM_END)
+  {
     return -1;
   }
   //utilize static adresses
@@ -606,7 +603,9 @@ int32_t vidmap(uint8_t** screen_start)
   Paddr = (uint32_t)VIDMEM_ADDR;
   //remap the memory from virtual loc to physical vidmems
   check = page_to_phys(Vaddr,Paddr);
-  if(check == -1){
+
+  if(check == -1)
+  {
     return -1;
   }
   //paging success! set new screen start and return
@@ -647,11 +646,10 @@ int32_t sigreturn(void)
 {
   return 0;
 }
-int32_t kill()
+void kill()
 {
-  halt(c_process_num);
-  sti();
-  return 0;
+  halt(255);
+  return;
 }
 int32_t ignore()
 {
