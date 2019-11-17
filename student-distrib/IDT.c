@@ -113,6 +113,7 @@ void exceptions(int exception_num)
 
     case 13:
       printf("General Protection Fault Exception \n");
+      page_flag = 1;
       break;
 
     case 14:
@@ -190,8 +191,10 @@ void exceptions(int exception_num)
   }
 
   exception_flag = 1;
-  while(1){}
-
+  if(page_flag == 0)
+  {
+    while(1){}
+  }
 }
 
 /*
@@ -223,7 +226,7 @@ void exceptions(int exception_num)
     }
 
     //set up exception handling entries
-    SET_IDT_ENTRY(idt[0], div_by_0);
+    SET_IDT_ENTRY(idt[0], handler0);
     SET_IDT_ENTRY(idt[1], debug);
     SET_IDT_ENTRY(idt[2], NMInt);
     SET_IDT_ENTRY(idt[3], breakpoint);
@@ -236,8 +239,8 @@ void exceptions(int exception_num)
     SET_IDT_ENTRY(idt[10], invalid_tss);
     SET_IDT_ENTRY(idt[11], seg_not_present);
     SET_IDT_ENTRY(idt[12], stack_seg_fault);
-    SET_IDT_ENTRY(idt[13], general_protection);
-    SET_IDT_ENTRY(idt[14], page_fault);
+    SET_IDT_ENTRY(idt[13], handler13);
+    SET_IDT_ENTRY(idt[14], handler14);
     SET_IDT_ENTRY(idt[15], reserved0);      //not sure if these need to handled
     SET_IDT_ENTRY(idt[16], floating_point);
     SET_IDT_ENTRY(idt[17], alignment_check);

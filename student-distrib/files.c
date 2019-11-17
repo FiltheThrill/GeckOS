@@ -42,13 +42,24 @@ int32_t read_dentry_by_name(const uint8_t* fname, dentry_t* dentry)
 {
   int i;
   int found;
+  int8_t* blank = "";
+
   if(fname == 0){   //if pointer to file is null return -1
     return FAILURE;
   }
+
+  //check if empty string
+  found = strncmp((const int8_t*)fname, (const int8_t*)blank, RESERVED32B);
+  if(found == 0)
+  {
+    return FAILURE;
+  }
+
   //loop through file names to see if it can be found
   for(i = 0; i < FILESMAX; i++)
   {
     found = strncmp((const int8_t*)fname, (const int8_t*)boot_block->dir_entries[i].file_name, RESERVED32B);
+
     if(found == SUCCESS)
     {
       //copy over to dentry
@@ -135,26 +146,6 @@ int32_t read_data(uint32_t inode, uint32_t offset, uint8_t* buf, uint32_t length
   data_blocks = (uint8_t*)(inode_addr + inode_num);  //first data block address (uint8_t*?)
   offset_blocks = offset / FOURKB;  //number of complete blocks
   offset_bytes = offset % FOURKB;    //number of bytes into the last block
-
-
-
-
-  // while(cpy_length > 0)
-  // {
-  //   data_idx = inode_addr[inode].data_block_idx[offset_blocks];
-  //   offset_length = FOURKB - offset_bytes;
-  //   if(cpy_length < offset_length)
-  //   {
-  //     offset_length = cpy_length;
-  //   }
-  //   buf_addr = (uint8_t*)(data_blocks + offset_bytes + data_idx * FOURKB);
-  //   memcpy(&buf[i], (const void*)buff_addr, offset_length);
-  //   i = offset_length + i;
-  //   cpy_length = cpy_length - offset_length;
-  //   bytes_read = bytes_read + offset_length
-  //   offset_blocks = offset_blocks + 1;
-  //   offset_bytes = 0;
-  // }
 
   while(1)
   {
@@ -310,18 +301,19 @@ int32_t dread(int32_t fd, void* buf, int32_t nbytes)
   int32_t check;
   uint32_t name_length;
   dentry_t read_dentry;
+  int32_t bytes_read = 0;
 
   if(d_index > 16)//check if its in bounds of the directories
   {
     d_index =  0;
-    return 0;
+    return bytes_read;
   }
 
   check = read_dentry_by_index(d_index, &read_dentry);  //finds directory by index and checks if it found it
 
   if(check == FAILURE)
   {
-    return 0;
+    return bytes_read;
   }
 
   name_length = strlen((int8_t*)read_dentry.file_name);
@@ -335,12 +327,13 @@ int32_t dread(int32_t fd, void* buf, int32_t nbytes)
   for(i = 0; i < name_length; i++)  //place directories into buf
   {
     ((uint8_t*)buf)[i] = read_dentry.file_name[i];
+    bytes_read++;
   }
-  if(name_length != RESERVED32B)
-  {
-    ((uint8_t*)buf)[i+1] = ' ';
-  }
+  // if(name_length != RESERVED32B)
+  // {
+  //   ((uint8_t*)buf)[i+1] = ' ';
+  // }
   //printf("i:%d d:%d ", i, d_index);
   d_index++;
-  return i;
+  return bytes_read;
 }

@@ -3,6 +3,7 @@ NEGONE = -1
 
 .text
 .globl syscall_handler
+.globl handler14, handler0, handler13
 
 syscall_handler:
     # movl %eax, %eax
@@ -43,6 +44,33 @@ syscall_handler:
   INVALID: # iret that bih, its wrong
     movl $NEGONE, %eax
     iret
+
+  handler14:
+    pushal
+    push $14
+    call exceptions
+    addl $4, %esp
+    popal
+    iret
+
+  handler13:
+    pushal
+    push $13
+    call exceptions
+    addl $4, %esp
+    popal
+    iret
+
+  handler0:
+    pushal
+    movl $0, %ecx
+    push %ecx
+    call exceptions
+    pop %ecx
+    popal
+    iret
+
+
 
 call_jump:
 .long halt, execute, read, write, open, close, getargs, vidmap, set_handler, sigreturn

@@ -75,7 +75,7 @@ int32_t p_process_num;
 int32_t c_process_num;
 
 extern void PCB_start();
-extern int32_t halt(uint8_t status);
+extern int32_t halt(int8_t status);
 
 extern int32_t execute(const uint8_t* command);
 
