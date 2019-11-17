@@ -32,6 +32,7 @@
 #define BACKSPACE   0x08
 #define CTRL_L      0x6C
 #define CTRL_C      0x63
+#define CTRL_G      0x67
 #define UPARW       0x48
 #define LEFTARW     0x4B
 #define RIGHTARW    0x4D

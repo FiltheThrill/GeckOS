@@ -5,13 +5,13 @@ https://wiki.osdev.org/PS2_Keyboard
 https://wiki.osdev.org/Text_Mode_Cursor
 
 */
-
 #include "keyboard.h"
 #include "i8259.h"
 #include "lib.h"
 #include "types.h"
 #include "terminal.h"
 #include "syscalls.h"
+#include "gui.h"
 //globals
 //static vars
 //lowercase translational table with numbers
@@ -493,6 +493,11 @@ int process_char(char c){
         term_clear(term,-1);
         kill();
         //sti();
+        return 1;
+      }
+    case CTRL_G:  //CTRL + G
+      if(ops[1] == 'y'){
+        vga_mode13();
         return 1;
       }
     default:
