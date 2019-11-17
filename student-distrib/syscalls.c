@@ -82,11 +82,14 @@ int32_t halt(int8_t status)
 {
   uint32_t esp_ret, ebp_ret;
   int i, root_check = 0;
+
+  //set up parent proccess essentials before wiping
   PCB_t* parent = PCB_six[c_process_num]->parent_process;
   esp_ret = PCB_six[c_process_num]->esp;
   ebp_ret = PCB_six[c_process_num]->ebp;
   tss.esp0 = PCB_six[c_process_num]->prev_esp0;
 
+  // wipe information in PCB
   for(i = 0; i < MAXFILES; i++)
   {
     PCB_six[c_process_num]->file_array[i].f_op_tbl_ptr = 0;
@@ -94,9 +97,11 @@ int32_t halt(int8_t status)
     PCB_six[c_process_num]->file_array[i].f_pos = 0;
     PCB_six[c_process_num]->file_array[i].flags = 0;
   }
+
   for(i = 0; i<MAXARGS; i++){
     PCB_six[c_process_num]->args[i] = 0;
   }
+
   //change back any of the editied handlers
   for(i = 0; i<SIG_CNT; i++){
     PCB_six[c_process_num]->sig_arr[i] = sig_map[i];
@@ -105,6 +110,7 @@ int32_t halt(int8_t status)
   {
     root_check = 1;
   }
+
   //if not the  root reset everything and reset the current process number
   if(root_check == 0)
   {
@@ -140,22 +146,27 @@ int32_t halt(int8_t status)
     temp = 256;
     exception_flag = 0;
   }
-  // update return value stack pointer and base pointer for jump to execute
+  // update return value
   asm volatile(
       "movl %0, %%eax\n"
       :
       :"r"(temp)
     );
+
+  //update stack pointer
   asm volatile(
       "movl %%ebx, %%esp\n"
       :
       :"b"(esp_ret)
     );
+
+  //update base pointer
   asm volatile(
       "mov %%ebx, %%ebp\n"
       :
       :"b"(ebp_ret)
     );
+
 //leave and return "from"" execute
   asm volatile(
     "leave\n"
@@ -163,7 +174,8 @@ int32_t halt(int8_t status)
     :
     :
   );
-  return status;
+
+  return temp;  //compilation's sake; never gets here
 }
 /*
  * execute
@@ -187,12 +199,9 @@ int32_t execute(const uint8_t* command)
   dentry_t word1;
   uint32_t base, stack;
   uint8_t header[FIRST40];
-  //cli();
 
   if(command == 0)  //check if command is NULL
   {
-    //uint8_t error_buf1[] = "Invalid cmd";
-    //term_write(1, error_buf1, ERROR_SIZE);
     error_flag = 1;
   }
 
@@ -213,12 +222,8 @@ int32_t execute(const uint8_t* command)
 
   if(check == FAILURE)   //a max amount of 6 processes can be running at any time
   {
-    //uint8_t error_buf2[] = "No available processes\n";
-    //term_write(1, error_buf2, ERROR_SIZE);
     error_flag = 1;
   }
-
-
 
 /*+++++++++++++++++++++++++++++ PART 1: Parse Command +++++++++++++++++++++++++++++++++++++++++++++++*/
 
@@ -245,7 +250,7 @@ int32_t execute(const uint8_t* command)
   }
   first_word[len_word1] = '\0'; //add end indentifier
 
-  if(flag == 1)   //presumambly not needed but put rest of word into another buffer
+  if(flag == 1)   //put rest of word into another buffer
   {
     for(i = len_word1 + 1; i < len; i++)
     {
@@ -259,6 +264,7 @@ int32_t execute(const uint8_t* command)
       PCB_six[c_process_num]->args[i] = rest_of_word[i];
     }
   }
+
   //save the entered commandand set argsize
   i=len_word1;
   while(i<len && i<MAXARGS){
@@ -267,21 +273,13 @@ int32_t execute(const uint8_t* command)
   }
   i++;
   PCB_six[c_process_num]->argsize = i-len_word1;
+
 /*+++++++++++++++++++++++++++++ PART 2: Executable check +++++++++++++++++++++++++++++++++++++++++++++++*/
 
-  //check if file name exists
-  // if(first_word[0] == 'l')
-  // {
-  //   int * ptr = NULL;
-  // 	int i = *ptr;
-  // 	i++;
-  // }
   check = read_dentry_by_name(first_word, &word1);
 
   if(check == FAILURE)
   {
-    //uint8_t error_buf3[] = "Couldn't find exectuable file\n";
-    //term_write(1, error_buf3, ERROR_SIZE);
     error_flag = 1;
   }
 
@@ -293,8 +291,6 @@ int32_t execute(const uint8_t* command)
 
   if(check == FAILURE)
   {
-    //uint8_t error_buf4[] = "Read_data failed\n";
-    //term_write(1, error_buf4, ERROR_SIZE);
     error_flag = 1;
   }
 
@@ -303,8 +299,6 @@ int32_t execute(const uint8_t* command)
   if((header[0] != ELF_MAGIC0) || (header[1] != ELF_MAGIC1) ||
      (header[2] != ELF_MAGIC2) || (header[3] != ELF_MAGIC3))
      {
-       //uint8_t error_buf5[] = "Not an executable\n";
-       //term_write(1, error_buf5, ERROR_SIZE);
        error_flag = 1;
      }
 
@@ -312,6 +306,7 @@ int32_t execute(const uint8_t* command)
 
    //set up page directory to map to physical memory and enable S, U , R, and P bits
   page_directory[PAGE128] = ((EIGHTMB + (process_num * FOURMB)) | SURP);
+
   //flush tlb everytime a new process is made
   asm volatile(
     "movl %%cr3, %%eax\n"
@@ -320,7 +315,6 @@ int32_t execute(const uint8_t* command)
     :
     :"eax"
   );
-
 
 /*+++++++++++++++++++++++++++++ PART 4: Program Loader +++++++++++++++++++++++++++++++++++++++++++++++*/
 
@@ -337,8 +331,6 @@ int32_t execute(const uint8_t* command)
 
   if(check == FAILURE)
   {
-    //uint8_t error_buf6[] = "Failed to load program\n";
-    //term_write(1, error_buf6, ERROR_SIZE);
     error_flag = 1;
   }
 /*+++++++++++++++++++++++++++++ PART 5: Create PCB +++++++++++++++++++++++++++++++++++++++++++++++*/
@@ -366,6 +358,7 @@ for(i = MINFD; i < MAXFILES; i++)
 for(i = 0; i<SIG_CNT; i++){
   PCB_six[c_process_num]->sig_arr[i] = sig_map[i];
 }
+
 // if this is is our first process make its own parent,
 // otherwise use the last process as parent
 if(process_num == 0)
@@ -404,11 +397,11 @@ else
   PCB_six[process_num]->ebp = base;
   PCB_six[process_num]->esp = stack;
 
-  if(error_flag == 1 || exception_flag == 1)
+  if(error_flag == 1 || exception_flag == 1) //halt if an error was encountered
   {
-    halt(-1);
+    halt(FAILURE);
   }
-  //sti();
+
   //push iret context
   asm volatile(
     "cli\n"
@@ -424,7 +417,7 @@ else
     "iret\n"
   );
 
-  return SUCCESS; //compilation's sake
+  return SUCCESS; //compilation's sake; never gets here
 }
 
 /*
@@ -439,10 +432,12 @@ else
  */
 int32_t read(int32_t fd, void* buf, int32_t nbytes)
 {
+  //check if its trying to read using stdwrite, an fd out of bounds or a file channel thats not active
    if((fd == STDOUTFD) || (fd > MAXFD) || (fd < 0) || (PCB_six[c_process_num]->file_array[fd].flags == 0))
    {
-     return -1;
+     return FAILURE;
    }
+   //call appropriate read
   return PCB_six[c_process_num]->file_array[fd].f_op_tbl_ptr->read(fd, buf, nbytes);
 }
 
@@ -458,10 +453,12 @@ int32_t read(int32_t fd, void* buf, int32_t nbytes)
  */
 int32_t write(int32_t fd, const void* buf, int32_t nbytes)
 {
+  //check if its tring to write using stdin or an fd out of bounds or an fd that isnt active
   if((fd <= STDINFD) || (fd > MAXFD) || (PCB_six[c_process_num]->file_array[fd].flags == 0))
   {
-    return -1;
+    return FAILURE;
   }
+  //call appropriate write
   return PCB_six[c_process_num]->file_array[fd].f_op_tbl_ptr->write(fd, buf, nbytes);
 }
 
@@ -475,33 +472,30 @@ int32_t write(int32_t fd, const void* buf, int32_t nbytes)
  */
 int32_t open(const uint8_t* filename)
 {
-  //cli();
   dentry_t open_dentry;
   int32_t type, check;
   int i, idx;
-  // uint8_t error_buf1[] = "Failed to open file by name";
-  // uint8_t error_buf2[] = "No descriptors are free";
-  // uint8_t error_buf3[] = "File type doesn't match";
 
   //find file by read_dentry_by_name
   check = read_dentry_by_name(filename, &open_dentry);
 
   if(check == FAILURE)
   {
-    //term_write(1, error_buf1, ERROR_SIZE);
     return FAILURE;
   }
 
   check = FAILURE;
   type = open_dentry.file_type; //find if its a file, directory or rtc
 
-  //find an open file array index that is not in use
+  //find an open file array index that is not in use and set up inode and file position
  for(i = MINFD; i < MAXFILES; i++)
  {
    if(PCB_six[c_process_num]->file_array[i].flags == 0)
     {
       idx = i;
       check = SUCCESS;
+      PCB_six[c_process_num]->file_array[idx].inode = open_dentry.inode_num;
+      PCB_six[c_process_num]->file_array[idx].f_pos = 0;
       PCB_six[c_process_num]->file_array[i].flags = 1;
       break;
     }
@@ -509,7 +503,6 @@ int32_t open(const uint8_t* filename)
 
 if(check == FAILURE)
 {
-  //term_write(1, error_buf2, ERROR_SIZE);
   return FAILURE;
 }
 
@@ -537,16 +530,12 @@ switch(type)
       //assign tables
       PCB_six[c_process_num]->file_array[idx].f_op_tbl_ptr = &file_table;
 
-      //load in inode #
-      PCB_six[c_process_num]->file_array[idx].inode = open_dentry.inode_num;
-      PCB_six[c_process_num]->file_array[idx].f_pos = 0;
       //use file open
       check = PCB_six[c_process_num]->file_array[idx].f_op_tbl_ptr->open(filename);
       return idx;
     default:
 
       //somehow type wasn't any of the above 3
-      //term_write(1, error_buf3, ERROR_SIZE);
       return FAILURE;
   }
 }
@@ -561,12 +550,13 @@ switch(type)
  */
 int32_t close(int32_t fd)
 {
-
+  //check if it is trying to close stdin or stdout, an FD larger than 8 or if the file channel is active
   if((fd < MINFD) || (fd > MAXFD) || (PCB_six[c_process_num]->file_array[fd].flags == 0))
   {
-    return -1;
+    return FAILURE;
   }
 
+  //set to non active channel and call appropriate close function
   PCB_six[c_process_num]->file_array[fd].flags = 0;
   return PCB_six[c_process_num]->file_array[fd].f_op_tbl_ptr->close(fd);
 }
@@ -585,19 +575,20 @@ int32_t getargs(uint8_t* buf, int32_t nbytes)
   int32_t len;
   //check for invalis cases (no args, NULL)
   if(buf == NULL || nbytes == 0){
-    return -1;
+    return FAILURE;
   }
 
   len = PCB_six[c_process_num]->argsize;
 
+  //copy over to buf
   for(i = 0; i < len; i++)
   {
     buf[i] = PCB_six[c_process_num]->args[i];
   }
 
-  buf[len] = '\0';
+  buf[len] = '\0';  //add end identifier
 
-  return 0;
+  return SUCCESS;
 }
 /*
  * vidmap
@@ -612,21 +603,25 @@ int32_t vidmap(uint8_t** screen_start)
 {
   int check;
   uint32_t Vaddr,Paddr;
+
   //check for invalid adresses
   if((uint32_t)screen_start < VIDMEM_START || (uint32_t)screen_start > VIDMEM_END)
   {
-    return -1;
+    return FAILURE;
   }
+
   //utilize static adresses
   Vaddr = (uint32_t)VIDMEM_CPY;
   Paddr = (uint32_t)VIDMEM_ADDR;
+
   //remap the memory from virtual loc to physical vidmems
   check = page_to_phys(Vaddr,Paddr);
 
-  if(check == -1)
+  if(check == FAILURE)
   {
-    return -1;
+    return FAILURE;
   }
+
   //paging success! set new screen start and return
   *screen_start = (uint8_t*)VIDMEM_CPY;
   return VIDMEM_CPY;
@@ -637,21 +632,23 @@ int32_t vidmap(uint8_t** screen_start)
  *   INPUTS:  signum - number of the signal to handle
  *            handler_address - address of the function to use
  *   OUTPUTS: none
- *   RETURN VALUE: returns 0 if set, or -1 if set failed
+ *   RETURN VALUE: returns 0 if set, or  if set failed
  *   SIDE EFFECTS: changes default prog operation
  */
 int32_t set_handler(int32_t signum, void* handler_address)
 {
   if(signum < 0 || signum > SIG_CNT){
-    return -1;
+    return FAILURE;
   }
+
   if(handler_address == NULL){
     PCB_six[c_process_num]->sig_arr[signum] = sig_map[signum];
   }
   else{
     PCB_six[c_process_num]->sig_arr[signum] = handler_address;
   }
-  return 0;
+
+  return SUCCESS;
 }
 /*
  * sigreturn
@@ -663,7 +660,7 @@ int32_t set_handler(int32_t signum, void* handler_address)
  */
 int32_t sigreturn(void)
 {
-  return 0;
+  return SUCCESS;
 }
 void kill()
 {
@@ -672,5 +669,5 @@ void kill()
 }
 int32_t ignore()
 {
-  return 0;
+  return SUCCESS;
 }
