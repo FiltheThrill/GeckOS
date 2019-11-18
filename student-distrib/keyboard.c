@@ -124,7 +124,7 @@ void update_term(unsigned int t){
 */
 int32_t term_write(int32_t fd, const void * buf, int32_t nbytes){
   int bytecnt, flag;
-  unsigned int t,i;
+  unsigned int t;
   char put;
   //get current terminal
   t = fetch_process();
@@ -149,6 +149,7 @@ int32_t term_write(int32_t fd, const void * buf, int32_t nbytes){
       term_putc(t, put);
       bytecnt++;
       cursorX[t]++;
+      validate_cursor(t);
       if(*((uint8_t *) buf) == '>'){
         //found new cmd prompt, update start pos
         cmd_start[t] = bytecnt + cursorY[t]*XMAX;
@@ -157,27 +158,10 @@ int32_t term_write(int32_t fd, const void * buf, int32_t nbytes){
     }
     buf = ((uint8_t *) buf + 1);
   }
-  //prompt found, validate
   if(cmd_flag[t] == 'n'){
     cursorX[t]--;
     move_cursor(t);
-    //bad newln behind prompt, fix
-    if(cursorX[t] > CURSORD){
-      for(i=0; i<CURSORD; i++){
-        cursorX[t]--;
-        term_putc(t, NULLCHAR);
-      }
-      cursorY[t]++;
-      cursorX[t] = 0;
-      validate_cursor(t);
-      for(i=0; i<CURSOROFF; i++){
-        term_putc(t, prompt[i]);
-        cursorX[t]++;
-      }
-      move_cursor(t);
-      cmd_start[t] = cursorX[t] + cursorY[t]*XMAX;
-    }
-    sti();
+    //sti();
   }
   return bytecnt;
 }
@@ -194,9 +178,35 @@ int32_t term_write(int32_t fd, const void * buf, int32_t nbytes){
 */
 int32_t term_read(int32_t fd, void * buf, int32_t nbytes){
   unsigned int t;
-  int32_t i,j;
+  int32_t i,j,x;
   char c;
 
+  //prompt found, validate
+  if(cmd_flag[t] == 'n'){
+    //bad prompt, fix it
+    x = cursorX[t];
+    if(cursorX[t] != CURSORD){
+      for(i=0; i<CURSORD; i++){
+        cursorX[t]--;
+        term_putc(t, NULLCHAR);
+      }
+      //write on new ln if stuff behind it
+      if(x > CURSORD){
+        cursorY[t]++;
+        cursorX[t] = 0;
+        validate_cursor(t);
+      }
+      else{
+        cursorX[t] = 0;
+      }
+      for(i=0; i<CURSOROFF; i++){
+        term_putc(t, prompt[i]);
+        cursorX[t]++;
+      }
+      move_cursor(t);
+      cmd_start[t] = cursorX[t] + cursorY[t]*XMAX;
+    }
+  }
   //check for prev write with no prompt
   t = fetch_process();
   if(cmd_flag[t] == 'y'){
@@ -209,10 +219,6 @@ int32_t term_read(int32_t fd, void * buf, int32_t nbytes){
     //spin while wait for read
   }
   cli();
-  //save entered command
-  if(USEHIST == 1){
-    history_write();
-  }
   c = cmd_buf[t][0];
   i = 0;
   //pull if inside buffer and set values
@@ -466,6 +472,9 @@ int process_char(char c){
   {
     case ENTER:  //enter
       termRead[term] = 'y';
+      if(USEHIST == 1){
+        history_write();
+      }
       return 2;
     case BACKSPACE: //backspace
       cursorX[term]--;
@@ -534,9 +543,6 @@ int process_char(char c){
 void reprint_cmd(uint8_t t){
   int tempX, tempY, i;
 
-  if(cmd_len[t] == 0){
-    return;
-  }
   if(cmd_start[t]+BUFMAX >= SCRSIZE){
     validate_cursor(t);
   }
@@ -816,7 +822,7 @@ char generate_char(uint8_t scancode){
 *   SIDE EFFECTS: swaps in the buffered command from history
 */
 int history_fetch(){
-  unsigned int i;
+  unsigned int i,x;
   char c;
 
   if(USEHIST == 0){
@@ -825,7 +831,6 @@ int history_fetch(){
   //check for invalid access
   if(histidx < -1){
     histidx = -1;
-    return 1;
   }
   if(histidx >= HISTNUM){
     histidx = HISTNUM-1;
@@ -836,6 +841,14 @@ int history_fetch(){
     for(i=0;i<BUFMAX;i++){
       cmd_buf[term][i] = NULLCHAR;
     }
+    cursorX[term] = 0;
+    cursorY[term] = 0;
+    x = cmd_start[term];
+    while(x > XMAX){
+      x = x - XMAX;
+      cursorY[term]++;
+    }
+    cursorX[term] = x;
     cmd_len[term] = 0;
     return 0;
   }
@@ -868,11 +881,11 @@ void history_write(){
   if(USEHIST == 0){
     return;
   }
-  for(i=0;i<HISTNUM-1;i++){
+  for(i=HISTNUM-1;i>0;i--){
     for(j=0;j<BUFMAX;j++){
-      cmd_hist[i+1][j] = cmd_hist[i][j];
+      cmd_hist[i][j] = cmd_hist[i-1][j];
     }
-    cmd_hist_len[i+1] = cmd_hist_len[i];
+    cmd_hist_len[i] = cmd_hist_len[i-1];
   }
   //store most recent cmd
   for(i=0;i<BUFMAX;i++){
