@@ -105,6 +105,7 @@ int32_t read_data(uint32_t inode, uint32_t offset, uint8_t* buf, uint32_t length
 {
   int32_t cpy_length, inode_len, inode_num, offset_blocks, offset_bytes, data_idx;
   int bytes_read = 0;
+  //int32_t offset_length;
   uint8_t* buf_addr;
   uint8_t* data_blocks;
   int i= 0;
@@ -114,6 +115,7 @@ int32_t read_data(uint32_t inode, uint32_t offset, uint8_t* buf, uint32_t length
 
   if((inode < 0) || (inode >= inode_num))  // check if inode is in bounds
   {
+  //  printf("inode not in bounds\n");
     return FAILURE;
   }
 
@@ -121,6 +123,7 @@ int32_t read_data(uint32_t inode, uint32_t offset, uint8_t* buf, uint32_t length
 
   if(inode_len <= 0)   //check if file is empty
   {
+//    printf("no information in this inode\n");
     return FAILURE;
   }
 
@@ -226,14 +229,19 @@ int32_t fwrite(int32_t fd, const void* buf, int32_t nbytes)
  */
 int32_t fread(int32_t fd, void* buf, int32_t nbytes)
 {
-  int32_t bytes_read = 0;
-  uint32_t inode, offset;
+  int32_t bytes_read;
+  uint32_t inode, offset, len;
 
-  //get info on current file we're reading from PCB
+
   inode = PCB_six[c_process_num]->file_array[fd].inode;
   offset = PCB_six[c_process_num]->file_array[fd].f_pos;
+  len = inode_addr[inode].length_in_B;
 
-  //place into buf and update file position for next read call (1Kb at a time)
+  if(offset >= len)
+  {
+    return 0;
+  }
+
   bytes_read = read_data(inode, offset, buf, nbytes);
   PCB_six[c_process_num]->file_array[fd].f_pos += bytes_read;
 
@@ -308,20 +316,24 @@ int32_t dread(int32_t fd, void* buf, int32_t nbytes)
     return bytes_read;
   }
 
-  d_index++; //increment for next directory read call (grep/ls)
-
   name_length = strlen((int8_t*)read_dentry.file_name);
 
   if(name_length > RESERVED32B) //make sure name is less than 32
   {
     name_length = RESERVED32B;
   }
+  //printf("%d\n", name_length);
 
   for(i = 0; i < name_length; i++)  //place directories into buf
   {
     ((uint8_t*)buf)[i] = read_dentry.file_name[i];
     bytes_read++;
   }
-
+  // if(name_length != RESERVED32B)
+  // {
+  //   ((uint8_t*)buf)[i+1] = ' ';
+  // }
+  //printf("i:%d d:%d ", i, d_index);
+  d_index++;
   return bytes_read;
 }
