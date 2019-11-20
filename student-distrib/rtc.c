@@ -107,37 +107,37 @@ int32_t rtc_write(int32_t fd, const void* buf, int32_t nbytes)
 	// if nbytes is not between 0 and 1024 or divisible by 2 return -1 for failure
 	switch(nbytes)
 	{
-		case 0:
+		case 1024:
 			rate = HZ_0;
 			break;
-		case 2:
+		case 512:
 			rate = HZ_2;
 			break;
-		case 4:
+		case 256:
 			rate = HZ_4;
 			break;
-		case 8:
+		case 128:
 			rate = HZ_8;
 			break;
-		case 16:
+		case 64:
 			rate = HZ_16;
 			break;
 		case 32:
 			rate = HZ_32;
 			break;
-		case 64:
+		case 16:
 			rate = HZ_64;
 			break;
-		case 128:
+		case 8:
 			rate = HZ_128;
 			break;
-		case 256:
+		case 4:
 			rate = HZ_256;
 			break;
-		case 512:
+		case 2:
 			rate = HZ_512;
 			break;
-		case 1024:
+		case 0:
 			rate = HZ_1024;
 			break;
 		default:

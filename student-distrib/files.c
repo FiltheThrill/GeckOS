@@ -233,8 +233,8 @@ int32_t fread(int32_t fd, void* buf, int32_t nbytes)
   uint32_t inode, offset, len;
 
 
-  inode = PCB_six[c_process_num]->file_array[fd].inode;
-  offset = PCB_six[c_process_num]->file_array[fd].f_pos;
+  inode = PCB_arr[c_process_num]->file_array[fd].inode;
+  offset = PCB_arr[c_process_num]->file_array[fd].f_pos;
   len = inode_addr[inode].length_in_B;
 
   if(offset >= len)
@@ -243,7 +243,7 @@ int32_t fread(int32_t fd, void* buf, int32_t nbytes)
   }
 
   bytes_read = read_data(inode, offset, buf, nbytes);
-  PCB_six[c_process_num]->file_array[fd].f_pos += bytes_read;
+  PCB_arr[c_process_num]->file_array[fd].f_pos += bytes_read;
 
   return bytes_read;
 }

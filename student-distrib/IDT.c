@@ -9,6 +9,8 @@ https://wiki.osdev.org/Exceptions
 #include "keyboard.h"
 #include "rtc.h"
 #include "syscall_wrapper.h"
+#include "syscalls.h"
+#include "types.h"
 //ecxeption handling for giant switch case
 void div_by_0(){exceptions(0);}
 void debug(){exceptions(1);}
@@ -55,146 +57,181 @@ void reserved10(){exceptions(31);}
 void exceptions(int exception_num)
 {
   //clear();
-  int page_flag = 0;
+
   switch(exception_num)
   {
     case 0:
-      printf("Divide By Zero Error Exception \n");
-      page_flag = 1;
-      break;
+      {uint8_t error_buf0[] = "Divide By Zero Error Exception\n";
+      term_write(1, error_buf0, ERROR_SIZE);
+      break;}
 
     case 1:
-      printf("Debug exception \n");
-      break;
+      {uint8_t error_buf1[] = "Debug Exception\n";
+      term_write(1, error_buf1, ERROR_SIZE);
+      break;}
 
     case 2:
-      printf("Non-maskable Interrupt Exception \n");
-      break;
+      {uint8_t error_buf2[] = "Non-maskable Interrupt Exception \n";
+      term_write(1, error_buf2, ERROR_SIZE);
+      break;}
 
     case 3:
-      printf("Breakpoint Exception \n");
-      break;
+      {uint8_t error_buf3[] = "Breakpoint Exception \n";
+      term_write(1, error_buf3, ERROR_SIZE);
+      break;}
 
     case 4:
-      printf("Overflow Exception \n");
-      break;
+    {  uint8_t error_buf4[] = "Overflow Exception \n";
+      term_write(1, error_buf4, ERROR_SIZE);
+      break;}
 
     case 5:
-      printf("Bound Range Exceeded Exception \n");
-      break;
+      {uint8_t error_buf5[] = "Bound Range Exceeded Exception \n";
+      term_write(1, error_buf5, ERROR_SIZE);
+      break;}
 
     case 6:
-      printf("Invalid Opcode Exception \n");
-      break;
+      {uint8_t error_buf6[] = "Invalid Opcode Exception \n";
+      term_write(1, error_buf6, ERROR_SIZE);
+      break;}
 
     case 7:
-      printf("Device Not Available Exception \n");
-      break;
+    {  uint8_t error_buf7[] = "Device Not Available Exception \n";
+      term_write(1, error_buf7, ERROR_SIZE);
+      break;}
 
     case 8:
-      printf("Double Fault Exception \n");
-      break;
+    {  uint8_t error_buf8[] = "Double Fault Exception \n";
+      term_write(1, error_buf8, ERROR_SIZE);
+      break;}
 
     case 9:
-      printf("Coprocessor Segment Overrun Exception \n");
-      break;
+      {uint8_t error_buf9[] = "Coprocessor Segment Overrun Exception \n";
+      term_write(1, error_buf9, ERROR_SIZE);
+      break;}
 
     case 10:
-      printf("Invalid TSS Exception \n");
-      break;
+      {uint8_t error_buf10[] = "Invalid TSS Exception \n";
+      term_write(1, error_buf10, ERROR_SIZE);
+      break;}
 
     case 11:
-      printf("Segment Not Present Exception \n");
-      break;
+      {uint8_t error_buf11[] = "Segment Not Present Exception \n";
+      term_write(1, error_buf11, ERROR_SIZE);
+      break;}
 
     case 12:
-      printf("Stack-Segment Fault Exception \n");
-      break;
+      {uint8_t error_buf12[] = "Stack-Segment Fault Exception \n";
+      term_write(1, error_buf12, ERROR_SIZE);
+      break;}
 
     case 13:
-      printf("General Protection Fault Exception \n");
-      page_flag = 1;
-      break;
+      {uint8_t error_buf13[] = "General Protection Fault Exception \n";
+      term_write(1, error_buf13, ERROR_SIZE);
+      break;}
 
     case 14:
-      printf("Page Fault Exception \n");
-      page_flag = 1;
-      break;
+      {uint8_t error_buf14[] = "Page Fault Exception \n";
+      term_write(1, error_buf14, ERROR_SIZE);
+      break;}
 
     case 15:
-      printf("I don't think you should be here. This is RESERVED 15 \n");
-      break;
+      {uint8_t error_buf15[] = "I don't think you should be here. This is RESERVED 15 \n";
+      term_write(1, error_buf15, ERROR_SIZE);
+      break;}
 
     case 16:
-      printf("x87 Floating-Point Exception \n");
-      break;
+      {uint8_t error_buf16[] = "x87 Floating-Point Exception \n";
+      term_write(1, error_buf16, ERROR_SIZE);
+      break;}
 
     case 17:
-      printf("Alignment Check Exception \n");
-      break;
+      {uint8_t error_buf17[] = "Alignment Check Exception \n";
+      term_write(1, error_buf17, ERROR_SIZE);
+      break;}
 
     case 18:
-      printf("Machine Check Exeption \n");
-      break;
+      {uint8_t error_buf18[] = "Machine Check Exeption \n";
+      term_write(1, error_buf18, ERROR_SIZE);
+      break;}
 
     case 19:
-      printf("SIMD Floating_Point Exception \n");
-      break;
+      {uint8_t error_buf19[] = "SIMD Floating_Point Exception \n";
+      term_write(1, error_buf19, ERROR_SIZE);
+      break;}
 
     case 20:
-      printf("Virtualiation Exception \n");
-      break;
+      {uint8_t error_buf20[] = "Virtualiation Exception \n";
+      term_write(1, error_buf20, ERROR_SIZE);
+      break;}
 
     case 21:
-      printf("I don't think you should be here. This is RESERVED 21 \n");
-      break;
+      {uint8_t error_buf21[] = "I don't think you should be here. This is RESERVED 21 \n";
+      term_write(1, error_buf21, ERROR_SIZE);
+      break;}
 
     case 22:
-      printf("I don't think you should be here. This is RESERVED 22 \n");
-      break;
+      {uint8_t error_buf22[] = "I don't think you should be here. This is RESERVED 22 \n";
+      term_write(1, error_buf22, ERROR_SIZE);
+      break;}
 
     case 23:
-      printf("I don't think you should be here. This is RESERVED 23 \n");
-      break;
+    {  uint8_t error_buf23[] = "I don't think you should be here. This is RESERVED 23 \n";
+      term_write(1, error_buf23, ERROR_SIZE);
+      break;}
 
     case 24:
-      printf("I don't think you should be here. This is RESERVED 24 \n");
-      break;
+      {uint8_t error_buf24[] = "I don't think you should be here. This is RESERVED 24 \n";
+      term_write(1, error_buf24, ERROR_SIZE);
+      break;}
 
     case 25:
-      printf("I don't think you should be here. This is RESERVED 25 \n");
-      break;
+      {uint8_t error_buf25[] = "I don't think you should be here. This is RESERVED 25 \n";
+      term_write(1, error_buf25, ERROR_SIZE);
+      break;}
 
     case 26:
-      printf("I don't think you should be here. This is RESERVED 26 \n");
-      break;
+      {uint8_t error_buf26[] = "I don't think you should be here. This is RESERVED 26 \n";
+      term_write(1, error_buf26, ERROR_SIZE);
+      break;}
 
     case 27:
-      printf("I don't think you should be here. This is RESERVED 27 \n");
-      break;
+      {uint8_t error_buf27[] = "I don't think you should be here. This is RESERVED 27 \n";
+      term_write(1, error_buf27, ERROR_SIZE);
+      break;}
 
     case 28:
-      printf("I don't think you should be here. This is RESERVED 28 \n");
+    {
+      uint8_t error_buf28[] = "I don't think you should be here. This is RESERVED 28 \n";
+      term_write(1, error_buf28, ERROR_SIZE);
       break;
+    }
 
     case 29:
-      printf("I don't think you should be here. This is RESERVED 29 \n");
+    {
+      uint8_t error_buf29[] = "I don't think you should be here. This is RESERVED 29 \n";
+      term_write(1, error_buf29, ERROR_SIZE);
       break;
+    }
 
     case 30:
-      printf("Security Exception \n");
+    {
+      uint8_t error_buf30[] = "Security Exception \n";
+      term_write(1, error_buf30, ERROR_SIZE);
       break;
+    }
 
     case 31:
-      printf("I don't think you should be here. This is RESERVED 31 \n");
+    {
+      uint8_t error_buf31[] = "I don't think you should be here. This is RESERVED 31 \n";
+      term_write(1, error_buf31, ERROR_SIZE);
       break;
+    }
   }
 
   exception_flag = 1;
-  if(page_flag == 0)
-  {
-    while(1){}
-  }
+  halt(-1);
+  while(1){}
 }
 
 /*
@@ -226,7 +263,7 @@ void exceptions(int exception_num)
     }
 
     //set up exception handling entries
-    SET_IDT_ENTRY(idt[0], handler0);
+    SET_IDT_ENTRY(idt[0], div_by_0);
     SET_IDT_ENTRY(idt[1], debug);
     SET_IDT_ENTRY(idt[2], NMInt);
     SET_IDT_ENTRY(idt[3], breakpoint);
@@ -239,8 +276,8 @@ void exceptions(int exception_num)
     SET_IDT_ENTRY(idt[10], invalid_tss);
     SET_IDT_ENTRY(idt[11], seg_not_present);
     SET_IDT_ENTRY(idt[12], stack_seg_fault);
-    SET_IDT_ENTRY(idt[13], handler13);
-    SET_IDT_ENTRY(idt[14], handler14);
+    SET_IDT_ENTRY(idt[13], general_protection);
+    SET_IDT_ENTRY(idt[14], page_fault);
     SET_IDT_ENTRY(idt[15], reserved0);      //not sure if these need to handled
     SET_IDT_ENTRY(idt[16], floating_point);
     SET_IDT_ENTRY(idt[17], alignment_check);
