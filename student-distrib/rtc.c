@@ -8,6 +8,8 @@ https://courses.engr.illinois.edu/ece391/fa2019/secure/references/ds12887.pdf
 #include "rtc.h"
 
 volatile int rtc_interrupt_flag;
+volatile int rtc_counter;
+volatile int rtc_curr_freq;
 
 /*
 * rtc_init
@@ -33,6 +35,16 @@ void rtc_init()
 	outb(REG_C, RTC_PORT); // allow interrupts to occur again
 	inb(CMOS_PORT);
 
+	cli(); // disable interrupts
+	outb(REG_A_NMI, RTC_PORT); // choose register A of the rtc with NMI
+	char prev = inb(CMOS_PORT); // get the previous value of reg a
+	outb (REG_A_NMI, RTC_PORT); // choose register A again
+	outb (((prev & FREQ_BITMASK) | HZ_1024), CMOS_PORT); // OR our new rate with the lower 4 bits for frequency
+	sti(); // enable interrupts
+
+	rtc_counter = 0;
+	rtc_curr_freq = 2;
+
 	enable_irq(8);
 
 }
@@ -52,8 +64,15 @@ void RTC_handler()
 	"pushal\n"
 	:
 	:);
+
+	if (rtc_counter > 1023)
+		rtc_counter = 0;
+	else
+		rtc_counter++;
+
 	//test_interrupts(); // Call test_interrupts
-	rtc_interrupt_flag = 0;
+	if (rtc_counter % 1024)
+		rtc_interrupt_flag = 0;
 
 	outb (REG_C, RTC_PORT); // Allow more interrupts to occur
 	inb(CMOS_PORT);
@@ -100,56 +119,46 @@ int32_t rtc_read(int32_t fd, void* buf, int32_t nbytes)
 */
 int32_t rtc_write(int32_t fd, const void* buf, int32_t nbytes)
 {
-	// initialize the rate to 0 Hz
-	char rate = HZ_0;
-
 	// use the value of nbytes to determine the frequency of our rtc
 	// if nbytes is not between 0 and 1024 or divisible by 2 return -1 for failure
 	switch(nbytes)
 	{
-		case 1024:
-			rate = HZ_0;
-			break;
-		case 512:
-			rate = HZ_2;
-			break;
-		case 256:
-			rate = HZ_4;
-			break;
-		case 128:
-			rate = HZ_8;
-			break;
-		case 64:
-			rate = HZ_16;
-			break;
-		case 32:
-			rate = HZ_32;
-			break;
-		case 16:
-			rate = HZ_64;
-			break;
-		case 8:
-			rate = HZ_128;
-			break;
-		case 4:
-			rate = HZ_256;
+		case 0:
+			rtc_curr_freq = 0;
 			break;
 		case 2:
-			rate = HZ_512;
+			rtc_curr_freq = 2;
 			break;
-		case 0:
-			rate = HZ_1024;
+		case 4:
+			rtc_curr_freq = 4;
+			break;
+		case 8:
+			rtc_curr_freq = 8;
+			break;
+		case 16:
+			rtc_curr_freq = 16;
+			break;
+		case 32:
+			rtc_curr_freq = 32;
+			break;
+		case 64:
+			rtc_curr_freq = 64;
+			break;
+		case 128:
+			rtc_curr_freq = 128;
+			break;
+		case 256:
+			rtc_curr_freq = 256;
+			break;
+		case 512:
+			rtc_curr_freq = 512;
+			break;
+		case 1024:
+			rtc_curr_freq = 1024;
 			break;
 		default:
 			return RTC_FAIL;
 	}
-
-	cli(); // disable interrupts
-	outb(REG_A_NMI, RTC_PORT); // choose register A of the rtc with NMI
-	char prev = inb(CMOS_PORT); // get the previous value of reg a
-	outb (REG_A_NMI, RTC_PORT); // choose register A again
-	outb (((prev & FREQ_BITMASK) | rate), CMOS_PORT); // OR our new rate with the lower 4 bits for frequency
-	sti(); // enable interrupts
 
 	// return 0
 	return RTC_SUCCESS;
@@ -166,13 +175,7 @@ int32_t rtc_write(int32_t fd, const void* buf, int32_t nbytes)
 */
 int32_t rtc_open(const uint8_t* filename)
 {
-	//set f = 2Hz
-	cli(); // disable interrupts
-	outb(REG_A_NMI, RTC_PORT); // choose register A of the rtc with NMI
-	char prev = inb(CMOS_PORT); // get the previous value of reg a
-	outb (REG_A_NMI, RTC_PORT); // choose register A again
-	outb (((prev & FREQ_BITMASK) | HZ_2), CMOS_PORT); // OR our new rate with the lower 4 bits for frequency (2Hz)
-	sti(); // enable interrupts
+	rtc_curr_freq = 2;
 
 	return RTC_SUCCESS;
 }
