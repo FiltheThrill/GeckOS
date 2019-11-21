@@ -37,15 +37,15 @@ void rtc_init()
 
 	cli(); // disable interrupts
 	outb(REG_A_NMI, RTC_PORT); // choose register A of the rtc with NMI
-	char prev = inb(CMOS_PORT); // get the previous value of reg a
+	prev = inb(CMOS_PORT); // get the previous value of reg a
 	outb (REG_A_NMI, RTC_PORT); // choose register A again
 	outb (((prev & FREQ_BITMASK) | HZ_1024), CMOS_PORT); // OR our new rate with the lower 4 bits for frequency
 	sti(); // enable interrupts
 
-	rtc_counter = 0;
-	rtc_curr_freq = 2;
+	rtc_counter = COUNTER_INIT;
+	rtc_curr_freq = FREQ_INIT;
 
-	enable_irq(8);
+	enable_irq(RTC_IRQ);
 
 }
 
@@ -65,20 +65,20 @@ void RTC_handler()
 	:
 	:);
 
-	if (rtc_counter > 1023)
-		rtc_counter = 0;
+	if (rtc_counter > MAX_HZ/rtc_curr_freq)
+		rtc_counter = COUNTER_INIT;
 	else
 		rtc_counter++;
 
 	//test_interrupts(); // Call test_interrupts
-	if (rtc_counter % 1024)
+	if (MAX_HZ/rtc_curr_freq == rtc_counter)
 		rtc_interrupt_flag = 0;
 
 	outb (REG_C, RTC_PORT); // Allow more interrupts to occur
 	inb(CMOS_PORT);
 
 	sti(); //enable interrupts
-	send_eoi(8); //send end of interrupt on irq8
+	send_eoi(RTC_IRQ); //send end of interrupt on irq8
 	asm volatile(
 	"popal\n"
 	:
@@ -124,7 +124,7 @@ int32_t rtc_write(int32_t fd, const void* buf, int32_t nbytes)
 	switch(nbytes)
 	{
 		case 0:
-			rtc_curr_freq = 0;
+			rtc_curr_freq = 2;
 			break;
 		case 2:
 			rtc_curr_freq = 2;
@@ -175,7 +175,7 @@ int32_t rtc_write(int32_t fd, const void* buf, int32_t nbytes)
 */
 int32_t rtc_open(const uint8_t* filename)
 {
-	rtc_curr_freq = 2;
+	rtc_curr_freq = FREQ_INIT;
 
 	return RTC_SUCCESS;
 }
