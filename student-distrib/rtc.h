@@ -8,6 +8,8 @@
 #define PIE_EN		0x40
 #define REG_C		0x0C
 #define FREQ_BITMASK	0xF0
+#define RTC_IRQ  8
+#define MAX_HZ  1024
 
 #define HZ_0		0x00
 #define HZ_2		0x0F
@@ -20,6 +22,9 @@
 #define HZ_256		0x08
 #define HZ_512		0x07
 #define HZ_1024		0x06
+
+#define COUNTER_INIT  1
+#define FREQ_INIT 2
 
 #define RTC_SUCCESS	0
 #define RTC_FAIL	-1
