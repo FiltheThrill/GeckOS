@@ -33,8 +33,8 @@ void PCB_start()
   int i;
   for(i = 0; i < MAXPROCESSES; i++)
   {
-    PCB_six[i] = (PCB_t*)(EIGHTMB - ((i + 1) * EIGHTKB));
-    PCB_six[i]->process_on = 0;
+    PCB_arr[i] = (PCB_t*)(EIGHTMB - ((i + 1) * EIGHTKB));
+    PCB_arr[i]->process_on = 0;
   }
 
   //setup stdin operations table
@@ -78,104 +78,100 @@ void PCB_start()
  *   RETURN VALUE: 0 for success -1 for failure
  *   SIDE EFFECTS: returns to parent process, changes ebp and esp and tss
  */
-int32_t halt(int8_t status)
-{
-  uint32_t esp_ret, ebp_ret;
-  int i, root_check = 0;
+ int32_t halt(int8_t status)
+ {
+   uint32_t esp_ret, ebp_ret;
+   int i, root_check = 0;
+   PCB_t* parent = PCB_arr[c_process_num]->parent_process;
+   esp_ret = PCB_arr[c_process_num]->esp;
+   ebp_ret = PCB_arr[c_process_num]->ebp;
+   tss.esp0 = PCB_arr[c_process_num]->prev_esp0;
 
-  //set up parent proccess essentials before wiping
-  PCB_t* parent = PCB_six[c_process_num]->parent_process;
-  esp_ret = PCB_six[c_process_num]->esp;
-  ebp_ret = PCB_six[c_process_num]->ebp;
-  tss.esp0 = PCB_six[c_process_num]->prev_esp0;
+   for(i = 0; i < MAXFILES; i++)
+   {
+     PCB_arr[c_process_num]->file_array[i].f_op_tbl_ptr = 0;
+     PCB_arr[c_process_num]->file_array[i].inode = -1;
+     PCB_arr[c_process_num]->file_array[i].f_pos = 0;
+     PCB_arr[c_process_num]->file_array[i].flags = 0;
+   }
+   for(i = 0; i<MAXARGS; i++){
+     PCB_arr[c_process_num]->args[i] = 0;
+   }
+   //change back any of the editied handlers
+   for(i = 0; i<SIG_CNT; i++){
+     PCB_arr[c_process_num]->sig_arr[i] = sig_map[i];
+   }
+   if(c_process_num == 0)
+   {
+     root_check = 1;
+     PCB_arr[c_process_num]->process_on = 0;
+   }
 
-  // wipe information in PCB
-  for(i = 0; i < MAXFILES; i++)
-  {
-    PCB_six[c_process_num]->file_array[i].f_op_tbl_ptr = 0;
-    PCB_six[c_process_num]->file_array[i].inode = -1;
-    PCB_six[c_process_num]->file_array[i].f_pos = 0;
-    PCB_six[c_process_num]->file_array[i].flags = 0;
-  }
-
-  for(i = 0; i<MAXARGS; i++){
-    PCB_six[c_process_num]->args[i] = 0;
-  }
-
-  //change back any of the editied handlers
-  for(i = 0; i<SIG_CNT; i++){
-    PCB_six[c_process_num]->sig_arr[i] = sig_map[i];
-  }
-  if(c_process_num == 0)
-  {
-    root_check = 1;
-  }
-
-  //if not the  root reset everything and reset the current process number
-  if(root_check == 0)
-  {
-    PCB_six[c_process_num]->argsize = 0;
-    PCB_six[c_process_num]->process_on = 0;
-    PCB_six[c_process_num]->ebp = 0;
-    PCB_six[c_process_num]->esp = 0;
-    PCB_six[c_process_num]->prev_ss0 = 0;
-    PCB_six[c_process_num]->prev_esp0 = 0;
-    PCB_six[c_process_num]->index = -1;
-    PCB_six[c_process_num]->p_index = -1;
-    PCB_six[c_process_num]->parent_process = 0;
+   //if not the  root reset everything and reset the current process number
+   if(root_check == 0)
+   {
+      PCB_arr[c_process_num]->argsize = 0;
+      PCB_arr[c_process_num]->process_on = 0;
+      PCB_arr[c_process_num]->ebp = 0;
+      PCB_arr[c_process_num]->esp = 0;
+      PCB_arr[c_process_num]->prev_ss0 = 0;
+      PCB_arr[c_process_num]->prev_esp0 = 0;
+      PCB_arr[c_process_num]->index = -1;
+      PCB_arr[c_process_num]->p_index = -1;
+      PCB_arr[c_process_num]->parent_process = 0;
+    }
     c_process_num = parent->index;
     p_process_num = parent->p_index;
-  }
 
-  //update page directory entry
-  page_directory[PAGE128] = ((EIGHTMB + (c_process_num * FOURMB)) | SURP);
+   //update page directory entry
+   page_directory[PAGE128] = ((EIGHTMB + (c_process_num * FOURMB)) | SURP);
 
-  //flush tlb
+
+   //flush tlb
+   asm volatile(
+     "movl %%cr3, %%eax\n"
+     "movl %%eax, %%cr3\n"
+     :
+     :
+     :"eax"
+   );
+
+
+   int32_t temp = (int32_t)status;
+   if(exception_flag == 1)
+   {
+     temp = 256;
+     exception_flag = 0;
+   }
+
+   // update return value stack pointer and base pointer for jump to execute
   asm volatile(
-    "movl %%cr3, %%eax\n"
-    "movl %%eax, %%cr3\n"
-    :
-    :
-    :"eax"
-  );
+       "movl %0, %%eax\n"
+       :
+       :"r"(temp)
+     );
 
-
-  int32_t temp = (int32_t)status;
-  if(exception_flag == 1)
-  {
-    temp = 256;
-    exception_flag = 0;
-  }
-  // update return value
   asm volatile(
-      "movl %0, %%eax\n"
-      :
-      :"r"(temp)
-    );
+       "movl %%ebx, %%esp\n"
+       :
+       :"b"(esp_ret)
+     );
 
-  //update stack pointer
   asm volatile(
-      "movl %%ebx, %%esp\n"
-      :
-      :"b"(esp_ret)
-    );
+       "mov %%ebx, %%ebp\n"
+       :
+       :"b"(ebp_ret)
+     );
 
-  //update base pointer
+  //leave and return "from"" execute
   asm volatile(
-      "mov %%ebx, %%ebp\n"
-      :
-      :"b"(ebp_ret)
-    );
+     "leave\n"
+     "ret"
+     :
+     :
+   );
 
-//leave and return "from"" execute
-  asm volatile(
-    "leave\n"
-    "ret"
-    :
-    :
-  );
-
-  return temp;  //compilation's sake; never gets here
+   return status;
 }
 /*
  * execute
@@ -195,24 +191,24 @@ int32_t execute(const uint8_t* command)
   uint8_t first_word[WORD_SIZE];    //128?
   uint8_t rest_of_word[WORD_SIZE];
   int32_t len;
-  int len_word1 = 0, i, check, flag = 0, error_flag = 0;
+  int len_word1 = 0, i, j, check, word_flag = 0, error_flag = 0;
   dentry_t word1;
   uint32_t base, stack;
   uint8_t header[FIRST40];
 
   if(command == 0)  //check if command is NULL
   {
-    error_flag = 1;
+    return FAILURE;
   }
 
   check = FAILURE;
 
   for(i = 0; i < MAXPROCESSES; i++)
   {
-    if(PCB_six[i]->process_on == 0)
+    if(PCB_arr[i]->process_on == 0)
     {
-      PCB_six[i]->process_on = 1;
-      PCB_six[i]->index = i;
+      PCB_arr[i]->process_on = 1;
+      PCB_arr[i]->index = i;
       process_num = i;
       c_process_num = i;
       check = SUCCESS;
@@ -222,7 +218,17 @@ int32_t execute(const uint8_t* command)
 
   if(check == FAILURE)   //a max amount of 6 processes can be running at any time
   {
-    error_flag = 1;
+    uint8_t error_buf1[] = "Max Proccesses Reached!\nExit Out of Shell to Continue.";
+    term_write(1, error_buf1, ERROR_SIZE);
+    return FULL;
+  }
+
+  if(c_process_num != 0)
+  {
+    if(((uint32_t)command > USER_END) || ((uint32_t)command < USER_START))
+    {
+      return FAILURE;
+    }
   }
 
 /*+++++++++++++++++++++++++++++ PART 1: Parse Command +++++++++++++++++++++++++++++++++++++++++++++++*/
@@ -234,12 +240,12 @@ int32_t execute(const uint8_t* command)
     if(command[i] ==  ' ')   //space separated command
     {
       len_word1 = i;
-      flag = 1;
+      word_flag = 1;
       break;
     }
   }
 
-  if(flag == 0)    //there is only one word
+  if(word_flag == 0)    //there is only one word
   {
     len_word1 = len;
   }
@@ -250,32 +256,40 @@ int32_t execute(const uint8_t* command)
   }
   first_word[len_word1] = '\0'; //add end indentifier
 
-  if(flag == 1)   //put rest of word into another buffer
+  if(word_flag == 1)   //put rest of word into another buffer
   {
+    j = 0;
     for(i = len_word1 + 1; i < len; i++)
     {
-      rest_of_word[i - len_word1 - 1] = command[i];
+      if(command[i] != ' ') //strip of leading in lagging spaces
+      {
+      rest_of_word[j] = command[i];
+      j++;
+      }
     }
-    rest_of_word[i - len_word1 - 1] = '\0';
-    PCB_six[c_process_num]->argsize = strlen((int8_t*)rest_of_word);
 
-    for(i = 0; i < PCB_six[c_process_num]->argsize; i++)
+    rest_of_word[j] = '\0'; // add end identifier
+    PCB_arr[process_num]->argsize = strlen((int8_t*)rest_of_word);
+
+    //copy over to pcb
+    for(i = 0; i < PCB_arr[process_num]->argsize; i++)
     {
-      PCB_six[c_process_num]->args[i] = rest_of_word[i];
+      PCB_arr[process_num]->args[i] = rest_of_word[i];
     }
   }
-
-  //save the entered commandand set argsize
-  i=len_word1;
-  while(i<len && i<MAXARGS){
-    PCB_six[c_process_num]->args[i] = rest_of_word[i];
-    i++;
-  }
-  i++;
-  PCB_six[c_process_num]->argsize = i-len_word1;
 
 /*+++++++++++++++++++++++++++++ PART 2: Executable check +++++++++++++++++++++++++++++++++++++++++++++++*/
 
+//store ebp and esp for eventual return to execute from halt
+asm volatile(
+  "movl %%esp, %0\n"
+  "movl %%ebp, %1\n"
+  :"=r"(stack), "=r"(base)
+);
+PCB_arr[process_num]->ebp = base;
+PCB_arr[process_num]->esp = stack;
+
+  //check if file name exists
   check = read_dentry_by_name(first_word, &word1);
 
   if(check == FAILURE)
@@ -316,6 +330,7 @@ int32_t execute(const uint8_t* command)
     :"eax"
   );
 
+
 /*+++++++++++++++++++++++++++++ PART 4: Program Loader +++++++++++++++++++++++++++++++++++++++++++++++*/
 
   //get length in bytes of our inode
@@ -336,48 +351,49 @@ int32_t execute(const uint8_t* command)
 /*+++++++++++++++++++++++++++++ PART 5: Create PCB +++++++++++++++++++++++++++++++++++++++++++++++*/
 
 //load stdin and stdout into filearray 0 and 1 respectively
-PCB_six[process_num]->file_array[0].f_op_tbl_ptr = &stdin;
-PCB_six[process_num]->file_array[1].f_op_tbl_ptr = &stdout;
-PCB_six[process_num]->file_array[0].inode = -1;
-PCB_six[process_num]->file_array[0].f_pos = 0;
-PCB_six[process_num]->file_array[0].flags = 1;
-PCB_six[process_num]->file_array[1].inode = -1;
-PCB_six[process_num]->file_array[1].f_pos = 0;
-PCB_six[process_num]->file_array[1].flags = 1;
+PCB_arr[process_num]->file_array[0].f_op_tbl_ptr = &stdin;
+PCB_arr[process_num]->file_array[1].f_op_tbl_ptr = &stdout;
+PCB_arr[process_num]->file_array[0].inode = -1;
+PCB_arr[process_num]->file_array[0].f_pos = 0;
+PCB_arr[process_num]->file_array[0].flags = 1;
+PCB_arr[process_num]->file_array[1].inode = -1;
+PCB_arr[process_num]->file_array[1].f_pos = 0;
+PCB_arr[process_num]->file_array[1].flags = 1;
 
 //initialize rest of file array
 for(i = MINFD; i < MAXFILES; i++)
 {
-  PCB_six[process_num]->file_array[i].f_op_tbl_ptr = 0;
-  PCB_six[process_num]->file_array[i].inode = -1;
-  PCB_six[process_num]->file_array[i].f_pos = 0;
-  PCB_six[process_num]->file_array[i].flags = 0;
+  PCB_arr[process_num]->file_array[i].f_op_tbl_ptr = 0;
+  PCB_arr[process_num]->file_array[i].inode = -1;
+  PCB_arr[process_num]->file_array[i].f_pos = 0;
+  PCB_arr[process_num]->file_array[i].flags = 0;
 }
 
 //init default signals
 for(i = 0; i<SIG_CNT; i++){
-  PCB_six[c_process_num]->sig_arr[i] = sig_map[i];
+  PCB_arr[c_process_num]->sig_arr[i] = sig_map[i];
 }
 
 // if this is is our first process make its own parent,
 // otherwise use the last process as parent
 if(process_num == 0)
 {
-  PCB_six[process_num]->parent_process = PCB_six[process_num];
+  PCB_arr[process_num]->parent_process = PCB_arr[process_num];
   p_process_num = process_num;
-  PCB_six[process_num]->p_index = p_process_num;
+  PCB_arr[process_num]->p_index = p_process_num;
 }
 else
 {
-  PCB_six[process_num]->parent_process = PCB_six[p_process_num];
+  PCB_arr[process_num]->parent_process = PCB_arr[p_process_num];
+  PCB_arr[process_num]->p_index = p_process_num;
   p_process_num = process_num;
-  PCB_six[process_num]->p_index = p_process_num;
 }
+
 /*+++++++++++++++++++++++++++++ PART 6: Context Switch +++++++++++++++++++++++++++++++++++++++++++++++*/
 
   // update esp and ss
-  PCB_six[process_num]->prev_esp0 = tss.esp0;
-  PCB_six[process_num]->prev_ss0 = tss.ss0;
+  PCB_arr[process_num]->prev_esp0 = tss.esp0;
+  PCB_arr[process_num]->prev_ss0 = tss.ss0;
 
   tss.esp0 = (uint32_t)(EIGHTMB - ((process_num + 1) * EIGHTKB) - PAGESIZE);
   tss.ss0 = KERNEL_DS;
@@ -388,16 +404,8 @@ else
   eip_addr = eip_addr | (header[25] << 8);
   eip_addr = eip_addr | header[24];
 
-  //store ebp and esp for eventual return to execute from halt
-  asm volatile(
-    "movl %%esp, %0\n"
-    "movl %%ebp, %1\n"
-    :"=r"(stack), "=r"(base)
-  );
-  PCB_six[process_num]->ebp = base;
-  PCB_six[process_num]->esp = stack;
 
-  if(error_flag == 1 || exception_flag == 1) //halt if an error was encountered
+  if(error_flag == 1) //if error flag was tripped anywhere; halt
   {
     halt(FAILURE);
   }
@@ -417,7 +425,7 @@ else
     "iret\n"
   );
 
-  return SUCCESS; //compilation's sake; never gets here
+  return SUCCESS; //compilation's sake
 }
 
 /*
@@ -432,13 +440,12 @@ else
  */
 int32_t read(int32_t fd, void* buf, int32_t nbytes)
 {
-  //check if its trying to read using stdwrite, an fd out of bounds or a file channel thats not active
-   if((fd == STDOUTFD) || (fd > MAXFD) || (fd < 0) || (PCB_six[c_process_num]->file_array[fd].flags == 0))
-   {
-     return FAILURE;
-   }
-   //call appropriate read
-  return PCB_six[c_process_num]->file_array[fd].f_op_tbl_ptr->read(fd, buf, nbytes);
+  if((fd == STDOUTFD) || (fd > MAXFD) || (fd < 0) || (PCB_arr[c_process_num]->file_array[fd].flags == 0))
+  {
+   return FAILURE;
+  }
+
+  return PCB_arr[c_process_num]->file_array[fd].f_op_tbl_ptr->read(fd, buf, nbytes);
 }
 
 /*
@@ -453,13 +460,11 @@ int32_t read(int32_t fd, void* buf, int32_t nbytes)
  */
 int32_t write(int32_t fd, const void* buf, int32_t nbytes)
 {
-  //check if its tring to write using stdin or an fd out of bounds or an fd that isnt active
-  if((fd <= STDINFD) || (fd > MAXFD) || (PCB_six[c_process_num]->file_array[fd].flags == 0))
+  if((fd <= STDINFD) || (fd > MAXFD) || (PCB_arr[c_process_num]->file_array[fd].flags == 0))
   {
     return FAILURE;
   }
-  //call appropriate write
-  return PCB_six[c_process_num]->file_array[fd].f_op_tbl_ptr->write(fd, buf, nbytes);
+  return PCB_arr[c_process_num]->file_array[fd].f_op_tbl_ptr->write(fd, buf, nbytes);
 }
 
 /*
@@ -476,33 +481,38 @@ int32_t open(const uint8_t* filename)
   int32_t type, check;
   int i, idx;
 
+  if(((uint32_t)filename > USER_END) || ((uint32_t)filename < USER_START))
+  {
+    return FAILURE;
+  }
+
   //find file by read_dentry_by_name
   check = read_dentry_by_name(filename, &open_dentry);
 
   if(check == FAILURE)
   {
+    //term_write(1, error_buf1, ERROR_SIZE);
     return FAILURE;
   }
 
   check = FAILURE;
   type = open_dentry.file_type; //find if its a file, directory or rtc
 
-  //find an open file array index that is not in use and set up inode and file position
+  //find an open file array index that is not in use
  for(i = MINFD; i < MAXFILES; i++)
  {
-   if(PCB_six[c_process_num]->file_array[i].flags == 0)
+   if(PCB_arr[c_process_num]->file_array[i].flags == 0)
     {
       idx = i;
       check = SUCCESS;
-      PCB_six[c_process_num]->file_array[idx].inode = open_dentry.inode_num;
-      PCB_six[c_process_num]->file_array[idx].f_pos = 0;
-      PCB_six[c_process_num]->file_array[i].flags = 1;
+      PCB_arr[c_process_num]->file_array[i].flags = 1;
       break;
     }
  }
 
 if(check == FAILURE)
 {
+  //term_write(1, error_buf2, ERROR_SIZE);
   return FAILURE;
 }
 
@@ -511,31 +521,35 @@ switch(type)
     case RTC:
 
       //assign table
-      PCB_six[c_process_num]->file_array[idx].f_op_tbl_ptr = &rtc_table;
+      PCB_arr[c_process_num]->file_array[idx].f_op_tbl_ptr = &rtc_table;
 
       //use rtc open
-       check = PCB_six[c_process_num]->file_array[idx].f_op_tbl_ptr->open(filename);
+       check = PCB_arr[c_process_num]->file_array[idx].f_op_tbl_ptr->open(filename);
        return idx;
     case DIRECTORY:
 
       //assign table
-      PCB_six[c_process_num]->file_array[idx].f_op_tbl_ptr = &directory_table;
+      PCB_arr[c_process_num]->file_array[idx].f_op_tbl_ptr = &directory_table;
 
       //use directory open
-      check = PCB_six[c_process_num]->file_array[idx].f_op_tbl_ptr->open(filename);
+      check = PCB_arr[c_process_num]->file_array[idx].f_op_tbl_ptr->open(filename);
       return idx;
 
     case FILE:
 
       //assign tables
-      PCB_six[c_process_num]->file_array[idx].f_op_tbl_ptr = &file_table;
+      PCB_arr[c_process_num]->file_array[idx].f_op_tbl_ptr = &file_table;
 
+      //load in inode #
+      PCB_arr[c_process_num]->file_array[idx].inode = open_dentry.inode_num;
+      PCB_arr[c_process_num]->file_array[idx].f_pos = 0;
       //use file open
-      check = PCB_six[c_process_num]->file_array[idx].f_op_tbl_ptr->open(filename);
+      check = PCB_arr[c_process_num]->file_array[idx].f_op_tbl_ptr->open(filename);
       return idx;
     default:
 
       //somehow type wasn't any of the above 3
+      //term_write(1, error_buf3, ERROR_SIZE);
       return FAILURE;
   }
 }
@@ -550,15 +564,14 @@ switch(type)
  */
 int32_t close(int32_t fd)
 {
-  //check if it is trying to close stdin or stdout, an FD larger than 8 or if the file channel is active
-  if((fd < MINFD) || (fd > MAXFD) || (PCB_six[c_process_num]->file_array[fd].flags == 0))
+
+  if((fd < MINFD) || (fd > MAXFD) || (PCB_arr[c_process_num]->file_array[fd].flags == 0))
   {
-    return FAILURE;
+    return -1;
   }
 
-  //set to non active channel and call appropriate close function
-  PCB_six[c_process_num]->file_array[fd].flags = 0;
-  return PCB_six[c_process_num]->file_array[fd].f_op_tbl_ptr->close(fd);
+  PCB_arr[c_process_num]->file_array[fd].flags = 0;
+  return PCB_arr[c_process_num]->file_array[fd].f_op_tbl_ptr->close(fd);
 }
 /*
  * getargs
@@ -575,20 +588,19 @@ int32_t getargs(uint8_t* buf, int32_t nbytes)
   int32_t len;
   //check for invalis cases (no args, NULL)
   if(buf == NULL || nbytes == 0){
-    return FAILURE;
+    return -1;
   }
 
-  len = PCB_six[c_process_num]->argsize;
+  len = PCB_arr[c_process_num]->argsize;
 
-  //copy over to buf
   for(i = 0; i < len; i++)
   {
-    buf[i] = PCB_six[c_process_num]->args[i];
+    buf[i] = PCB_arr[c_process_num]->args[i];
   }
 
-  buf[len] = '\0';  //add end identifier
+  buf[len] = '\0';
 
-  return SUCCESS;
+  return 0;
 }
 /*
  * vidmap
@@ -603,25 +615,21 @@ int32_t vidmap(uint8_t** screen_start)
 {
   int check;
   uint32_t Vaddr,Paddr;
-
   //check for invalid adresses
-  if((uint32_t)screen_start < VIDMEM_START || (uint32_t)screen_start > VIDMEM_END)
+  if((uint32_t)screen_start < USER_START || (uint32_t)screen_start > USER_END)
   {
-    return FAILURE;
+    return -1;
   }
-
   //utilize static adresses
   Vaddr = (uint32_t)VIDMEM_CPY;
   Paddr = (uint32_t)VIDMEM_ADDR;
-
   //remap the memory from virtual loc to physical vidmems
   check = page_to_phys(Vaddr,Paddr);
 
-  if(check == FAILURE)
+  if(check == -1)
   {
-    return FAILURE;
+    return -1;
   }
-
   //paging success! set new screen start and return
   *screen_start = (uint8_t*)VIDMEM_CPY;
   return VIDMEM_CPY;
@@ -632,23 +640,21 @@ int32_t vidmap(uint8_t** screen_start)
  *   INPUTS:  signum - number of the signal to handle
  *            handler_address - address of the function to use
  *   OUTPUTS: none
- *   RETURN VALUE: returns 0 if set, or  if set failed
+ *   RETURN VALUE: returns 0 if set, or -1 if set failed
  *   SIDE EFFECTS: changes default prog operation
  */
 int32_t set_handler(int32_t signum, void* handler_address)
 {
   if(signum < 0 || signum > SIG_CNT){
-    return FAILURE;
+    return -1;
   }
-
   if(handler_address == NULL){
-    PCB_six[c_process_num]->sig_arr[signum] = sig_map[signum];
+    PCB_arr[c_process_num]->sig_arr[signum] = sig_map[signum];
   }
   else{
-    PCB_six[c_process_num]->sig_arr[signum] = handler_address;
+    PCB_arr[c_process_num]->sig_arr[signum] = handler_address;
   }
-
-  return SUCCESS;
+  return 0;
 }
 /*
  * sigreturn
@@ -660,7 +666,7 @@ int32_t set_handler(int32_t signum, void* handler_address)
  */
 int32_t sigreturn(void)
 {
-  return SUCCESS;
+  return 0;
 }
 void kill()
 {
@@ -669,5 +675,5 @@ void kill()
 }
 int32_t ignore()
 {
-  return SUCCESS;
+  return 0;
 }

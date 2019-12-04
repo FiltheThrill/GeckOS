@@ -5,9 +5,9 @@
 
 #define VIRTUAL_ADDR 0x08048000
 #define FIRSTPCB 0x07FE000  //first pcb will be at bottom of kernel memory? 8mb - 8kb
-#define EIGHTMB (1 << 23)
-#define FOURMB  (1 << 22)
-#define EIGHTKB (1 << 13)
+#define EIGHTMB 0x0800000
+#define FOURMB  0x0400000
+#define EIGHTKB 0x02000
 #define SURP    0x09F
 #define MAXPROCESSES  6
 #define MAXFILES    8
@@ -30,10 +30,12 @@
 #define STDOUTFD 1
 #define PAGESIZE 4
 #define VIDMEM_CPY 0x8800000  //address for user vid mem
-#define VIDMEM_START 0x8000000 //address for vidmem start
-#define VIDMEM_END 0x8400000
+#define USER_START 0x8000000 //address for user start
+#define USER_END 0x8400000
 #define ATTR_HALT  0x87
 #define SIG_CNT    5
+#define FULL      0
+
 //
 //https://barrgroup.com/Embedded-Systems/How-To/C-Function-Pointers
 typedef struct { //disgusting
@@ -69,7 +71,7 @@ typedef struct PCB_t{
   void* sig_arr[SIG_CNT];
 } PCB_t;
 
-PCB_t* PCB_six[6];
+PCB_t* PCB_arr[MAXPROCESSES];
 
 int32_t p_process_num;
 int32_t c_process_num;
