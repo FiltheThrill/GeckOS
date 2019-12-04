@@ -56,6 +56,7 @@ void term_init(){
     }
   }
   curterm = 0;
+  shellflag = 0;
   return;
 }
 //launch term executes term after everything else is initialized
@@ -63,6 +64,7 @@ void launch_term(){
   curterm = 0;
   termrun[0] = 'y';
   shellpid[0] = 0; //first process num
+  shellflag = 1;
   execute((const uint8_t*) "shell");
   return;
 }
@@ -95,12 +97,13 @@ int term_start(int t){
   //not running, must start a new shell and swap to
   else{
     termrun[t] = 'y';
-    term_swap(t);
     //start new shell
-    execute((const uint8_t*) "shell");
+    shellflag = 1;
     shellpid[t] = c_process_num;
+    term_swap(t);
     context_swap(t);
     curterm = t;
+    execute((const uint8_t*) "shell");
     return 1;
   }
 }
@@ -201,10 +204,11 @@ void context_swap(int t){
   );
   swapebp[curterm] = base;
   swapesp[curterm] = stack;
-  //the destination is new
+  //the destination is new, execute will swap?
   if(swapebp[t] == 0 || swapesp[t] == 0){
     base = PCB_arr[c_process_num]->ebp;
     stack = PCB_arr[c_process_num]->esp;
+    return;
   }
   else{
     base = swapebp[t];
@@ -224,8 +228,26 @@ void context_swap(int t){
   flush_tlb();
   return;
 }
+//function to get the proper terminal process id in order to do sys calls
+unsigned int fetch_process(){
+  unsigned int id, pid;
+  int i;
+  PCB_t* node;
+  //find the parent (shell)
+  id = c_process_num;
+  for(i=0; i<MAXPROCESSES; i++){
+    node = PCB_arr[id];
+    pid = node->p_index;
+    if(id == pid){
+      return id;
+    }
+    id = pid;
+  }
+  //return curterm ( failed to find D: )
+  return curterm;
+}
 //returns the requested term's usr mem adress
-uint8_t term_addr(unsigned int t){
+uint32_t term_addr(unsigned int t){
   return termmem[t];
 }
 //opens the termianl (dummy func)

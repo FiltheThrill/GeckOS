@@ -23,7 +23,7 @@
 #define SBUF        0x21        //size of name buffer
 #define VIDMEM_ADDR 0xB8000     //vidmem address
 //feature controls
-#define MULTITERM   0x00        //binary on off for multi term
+#define MULTITERM   0x01        //binary on off for multi term
 #define USEHIST     0x01        //binary on/off for history feature
 #define USECMD      0x01        //binary on/off for extra keyboard commands
 //character switch defs
@@ -61,7 +61,6 @@ extern void term_clear(unsigned int t, int op);
 extern void term_putc(unsigned int t, uint8_t c);
 //internals
 void move_cursor(unsigned int t);
-unsigned int fetch_process();
 int process_char(char c);
 int process_media(uint8_t scancode);
 int parse_input(uint8_t scancode);

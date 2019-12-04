@@ -127,7 +127,7 @@ int32_t term_write(int32_t fd, const void * buf, int32_t nbytes){
   int bytecnt, flag;
   unsigned int t,i;
   char put;
-  //get current terminal
+  //get terminal based on process
   t = fetch_process();
   //shorten to string size
   if(nbytes > strlen(buf)){
@@ -1023,18 +1023,6 @@ void auto_comp(){
   reprint_cmd(term);
   move_cursor(term);
   return;
-}
-//function to get the process id in order to do sys calls
-//this returns 0 for now but will be useful for multi terms
-unsigned int fetch_process(){
-  unsigned int id;
-
-  id = term;
-  if(id<0 || id>TNUM){      //invalid process, make guess
-    return term;
-  }
-  //return the term for now
-  return id;
 }
 /*
 * term_putc

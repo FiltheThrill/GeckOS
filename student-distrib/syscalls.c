@@ -19,6 +19,7 @@ operations_table_t file_table;
 operations_table_t rtc_table;
 operations_table_t directory_table;
 static void* sig_map[] = {kill,kill,kill,ignore,ignore};
+volatile int pcnt;
 /*
  * PCB_start
  *   DESCRIPTION: initializes PCB array at bottom of the 4mb kernel stack, each
@@ -191,6 +192,7 @@ int32_t execute(const uint8_t* command)
   uint8_t first_word[WORD_SIZE];    //128?
   uint8_t rest_of_word[WORD_SIZE];
   int32_t len;
+  int shellcall;
   int len_word1 = 0, i, j, check, word_flag = 0, error_flag = 0;
   dentry_t word1;
   uint32_t base, stack;
@@ -200,7 +202,9 @@ int32_t execute(const uint8_t* command)
   {
     return FAILURE;
   }
-
+  //check for a shell
+  shellcall = shellflag;
+  shellflag = 0;
   check = FAILURE;
 
   for(i = 0; i < MAXPROCESSES; i++)
@@ -218,6 +222,7 @@ int32_t execute(const uint8_t* command)
     processcnt++;
   }
 
+  pcnt = processcnt;
   if(check == FAILURE)   //a max amount of 6 processes can be running at any time
   {
     uint8_t error_buf1[] = "Max Proccesses Reached!\nExit Out of Shell to Continue.";
@@ -225,7 +230,7 @@ int32_t execute(const uint8_t* command)
     return FULL;
   }
 
-  if(c_process_num != 0)
+  if(c_process_num != 0 && shellcall == 0)
   {
     if(((uint32_t)command > USER_END) || ((uint32_t)command < USER_START))
     {
@@ -378,7 +383,7 @@ for(i = 0; i<SIG_CNT; i++){
 
 // if this is is our first process make its own parent,
 // otherwise use the last process as parent
-if(process_num == 0)
+if(process_num == 0 || shellcall == 1)
 {
   PCB_arr[process_num]->parent_process = PCB_arr[process_num];
   p_process_num = process_num;

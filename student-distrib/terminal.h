@@ -7,13 +7,16 @@
 //attr for term background color
 static uint8_t tattr[TNUM] = {7,6,5};
 
+extern unsigned int fetch_process();
 extern void term_init();
 extern void term_swap(unsigned int t);
 extern int term_start(int t);
-extern uint8_t term_addr(unsigned int t);
+extern uint32_t term_addr(unsigned int t);
 extern int32_t term_open(const uint8_t* filename);
 extern int32_t term_close(int32_t fd);
 extern void launch_term();
 extern void context_swap(int t);
 extern void term_stop(int t);
+
+volatile int shellflag;                   //indicator for shell run
 #endif
