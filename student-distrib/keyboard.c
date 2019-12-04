@@ -3,7 +3,6 @@ Author - Ian Goodwin
 //resources used
 https://wiki.osdev.org/PS2_Keyboard
 https://wiki.osdev.org/Text_Mode_Cursor
-
 */
 
 #include "keyboard.h"
@@ -19,8 +18,8 @@ static char scancode_lower[] = {0, 0, '1', '2', '3', '4', '5', '6', '7', '8', '9
                             '-', '=', 0x08, 0x09, 'q', 'w', 'e', 'r', 't', 'y', 'u',
                             'i', 'o', 'p', '[', ']', 0x0D, 0, 'a', 's', 'd', 'f','g',
                             'h', 'j', 'k', 'l', ';', 0x27, 0x60, 0, 0x5c, 'z', 'x', 'c',
-                            'v', 'b', 'n', 'm', ',', '.', '/', 0, '*', 0, ' ', 0, 0,
-                             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, '7', '8', '9', '-', '4',
+                            'v', 'b', 'n', 'm', ',', '.', '/', 0, '*', 0, ' ', 0, 0x3B,
+                             0x3C, 0x3D, 0, 0, 0, 0, 0, 0, 0, 0, 0, '7', '8', '9', '-', '4',
                             '5', '6', '+', '1', '2', '3', '0', '.'};
 //uppercase translational table with special chars
 static char scancode_upper[] = {0, 0, '!', '@', '#', '$', '%', '^', '&', '*', '(', ')',
@@ -40,8 +39,6 @@ static char scancode_caps[] = {0, 0, '1', '2', '3', '4', '5', '6', '7', '8', '9'
                             '5', '6', '+', '1', '2', '3', '0', '.'};
 //cmd prompt to display in term, also default one
 static char prompt[CURSOROFF] = {'3','9','1','O','S','>'};
-//attr for term background color
-static uint8_t attr[TNUM] = {7,6,5};
 //dynamic vars (made volatile to survive running)
 //all keyboard uses for each possible terminal are stored here
 volatile unsigned int term;                      //global for current terminal 0,(1,2,3,4 for multiterm)
@@ -52,7 +49,7 @@ volatile char cmd_buf[TNUM][BUFMAX];             //global cmd store for any term
 volatile int cmd_start[TNUM];                    //active cmd loc start addr relative to screen
 volatile int cursorX[TNUM];                      //cursor x val
 volatile int cursorY[TNUM];                      //cursor y val(line num)
-volatile uint32_t address[TNUM];                 //vid mem pointers
+volatile uint32_t address[TNUM];                 //usr vid mem pointers
 //boolean using n or y
 volatile unsigned char termRead[TNUM];           //allow typed term read
 volatile char cmd_flag[TNUM];                    //flag to detect prompt writes
@@ -72,7 +69,7 @@ volatile int cmd_hist_len[HISTNUM];              //stores the saved cmd len
 void keyboard_init(){
   //no protect needed, interrupt not enabled
   //set global trackers and commands
-  //have to init_terminal first in order to run this
+  //have to init_terminal first in order to run this stuff
   int i,j,k;
 
   for(i=0;i<TNUM;i++){
@@ -105,13 +102,17 @@ void keyboard_init(){
   //set term num to first term (0)
   term = 0;
   histidx = -1;
+  //clear vidmem
+  clear();
   //enable req
   enable_irq(KEYIRQ);
   return;
 }
-//updates the term in use
+//updates the current term in use
 void update_term(unsigned int t){
   term = t;
+  move_cursor(t);
+  return;
 }
 /*
 * term_write
@@ -299,6 +300,10 @@ void move_cursor(unsigned int t){
   //handle screen bounds check
   validate_cursor(t);
   loc = cursorY[t] * XMAX + cursorX[t]; //find loc
+  //dont actually move if not the active screen
+  if(t != term){
+    return;
+  }
   //write low bits
   outb(C0F,C3D4);
   outb((uint8_t)(loc& 0xFF),C3D5);
@@ -379,7 +384,13 @@ void scroll_screen(unsigned int t){
   int x,y;
   char c[XMAX];
   uint8_t attr[XMAX];
+  uint32_t tmpaddr;
 
+  tmpaddr =  address[t];
+  //checck for regular vidmem edit
+  if(t == term){
+    address[t] = VIDMEM_ADDR;
+  }
   cli();
   //iterate over the rows and move them one up
   for(y=1;y<YMAX;y++){
@@ -399,6 +410,7 @@ void scroll_screen(unsigned int t){
     *(uint8_t *)(address[t] + ((XMAX * (YMAX-1) + x) << 1)) = NULLCHAR;
     *(uint8_t *)(address[t] + ((XMAX * (YMAX-1) + x) << 1) + 1) = attr[x];
   }
+  address[t] = tmpaddr;
   //rectify cursor and shift cmd_start up
   cursorX[t] = 0;
   cursorY[t] = YMAX-1;
@@ -467,6 +479,7 @@ int process_char(char c){
     case ENTER:  //enter
       termRead[term] = 'y';
       return 2;
+      break;
     case BACKSPACE: //backspace
       cursorX[term]--;
       ret = validate_move();
@@ -481,6 +494,7 @@ int process_char(char c){
         move_cursor(term);
       }
       return 1;
+      break;
     case CTRL_L:  //CTRL + l
       if(ops[1] == 'y'){
         term_clear(term,0);
@@ -490,11 +504,28 @@ int process_char(char c){
       break;
     case CTRL_C:  //CTRL + c
       if(ops[1] == 'y'){
-        term_clear(term,-1);
-        kill();
-        //sti();
+        term_stop(term);
         return 1;
       }
+      break;
+    case ALT_F1:  //ALT + f1
+      if(ops[3] == 'y'){
+        term_start(0);
+        return 1;
+      }
+      break;
+    case ALT_F2:  //ALT + f2
+      if(ops[3] == 'y'){
+        term_start(1);
+        return 1;
+      }
+      break;
+    case ALT_F3:  //ALT + f3
+      if(ops[3] == 'y'){
+        term_start(2);
+        return 1;
+      }
+      break;
     default:
       break;
   }
@@ -1016,16 +1047,19 @@ unsigned int fetch_process(){
 *   SIDE EFFECTS: will add a char in the idex of the memory location desired
 */
 void term_putc(unsigned int t, uint8_t c){
+  uint32_t tmpaddr;
   //do same as reg putc buf with my vars
-  if(MULTITERM == 0){
+  tmpaddr = address[t];
+  if(MULTITERM == 0 || t == term){
     //use standard vmem address
-    address[t] = 0xB8000;
+    address[t] = VIDMEM_ADDR;
   }
   if(cursorY[t] * XMAX + cursorX[t] > SCRSIZE){
     return;
   }
   *(uint8_t *)(address[t] + ((XMAX * cursorY[t] + cursorX[t]) << 1)) = c;
-  *(uint8_t *)(address[t] + ((XMAX * cursorY[t] + cursorX[t]) << 1) + 1) = attr[t];
+  *(uint8_t *)(address[t] + ((XMAX * cursorY[t] + cursorX[t]) << 1) + 1) = tattr[t];
+  address[t] = tmpaddr;
   return;
 }
 /*
@@ -1041,15 +1075,15 @@ void term_putc(unsigned int t, uint8_t c){
 void term_clear(unsigned int t, int op){
   int i;
 
-  //do reg clear if not paging
-  if(MULTITERM == 0){
+  //do reg clear if on curterm
+  if(MULTITERM == 0 || t == term){
     clear();
   }
-  //modify given clear, blank vid mem
+  //modify given clear, blank user vid mem
   else{
     for (i = 0; i < SCRSIZE; i++) {
-        *(uint8_t *)(address[t] + (i << 1)) = ' ';
-        *(uint8_t *)(address[t] + (i << 1) + 1) = attr[t];
+        *(uint8_t *)(address[t] + (i << 1)) = NULLCHAR;
+        *(uint8_t *)(address[t] + (i << 1) + 1) = tattr[t];
     }
   }
   cmd_start[t] = CURSOROFF;

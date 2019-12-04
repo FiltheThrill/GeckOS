@@ -81,6 +81,38 @@ uint32_t get_attr(char table, int check){
       return -1;
   }
 }
+/*
+* term_page
+*   DESCRIPTION: makes pages for each terminal
+*   INPUTS: tnum - number of terminals desired
+*           uint32_t* addr - array for created page adresses
+*   OUTPUTS: none
+*   RETURN VALUE: # of pages created
+*   SIDE EFFECTS: writes in user video memory
+*/
+int term_page(int tnum, uint32_t* addr){
+  int i;
+  uint32_t idx, ad, tmp;
+
+  //validity checks
+  if(addr == NULL || tnum < 1){
+    return 0;
+  }
+  idx = VIDMEM_SPACE / KERNEL_ADDR;
+  for(i=1; i<tnum+1; i++){
+      //iterate by one KB for each new page
+      ad = VIDMEM_SPACE + (FOUR_KB*i);
+      addr[i-1] = ad;
+      tmp =  get_attr('u',7);
+      if(tmp == -1){
+        return i-1;
+      }
+      page_directory[idx] = tmp;
+      usr_page_table[i] =  ad | 7;
+  }
+  flush_tlb();
+  return tnum;
+}
  /*
 * page_to_phys
 *   DESCRIPTION: maps any given virtual adress to user space page
@@ -110,6 +142,7 @@ int page_to_phys(uint32_t Vaddr, uint32_t Paddr){
   flush_tlb();
   return 0;
 }
+//shell for calling the flush assembly
  void flush_tlb()
  {
    flush_tlb_asm();

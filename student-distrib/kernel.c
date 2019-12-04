@@ -143,25 +143,22 @@ void entry(unsigned long magic, unsigned long addr) {
         tss.esp0 = 0x800000;
         ltr(KERNEL_TSS);
     }
+    /* init idt */
     idt_init();
     /* Init the PIC */
     i8259_init();
     /* Init paging */
 	  paging_init();
-    clear();
+	  /* Init the RTC */
+	  rtc_init();
+    /* init files */
+    files_init(boot);
+    /* init PCB */
+    PCB_start();
     /* Init the terminal */
     term_init();
-
-
     /* Init the keyboard */
     keyboard_init();
-
-	   /* Init the RTC */
-	   rtc_init();
-     /* init files */
-     files_init(boot);
-
-     PCB_start();
     /* Initialize devices, memory, filesystem, enable device interrupts on the
      * PIC, any other initialization stuff... */
      //term_putc('a');
@@ -178,10 +175,10 @@ void entry(unsigned long magic, unsigned long addr) {
     /* Run tests */
     launch_tests();
 #endif
-    /* Execute the first program ("shell") ... */
-    while(1 == 1)
-    {
-      execute((const uint8_t*) "shell");
+    /* Execute the first program ("shell") - via terminal now */
+    launch_term();
+    while(1==1){
+      //yeet
     }
     /* Spin (nicely, so we don't chew up cycles) */
     asm volatile (".1: hlt; jmp .1;");

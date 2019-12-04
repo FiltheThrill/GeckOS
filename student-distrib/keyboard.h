@@ -21,6 +21,7 @@
 #define HISTNUM     0x05        //cnt for how many commands can be saved
 #define OPNUM       0x05        //amount of ops to watch
 #define SBUF        0x21        //size of name buffer
+#define VIDMEM_ADDR 0xB8000     //vidmem address
 //feature controls
 #define MULTITERM   0x00        //binary on off for multi term
 #define USEHIST     0x01        //binary on/off for history feature
@@ -45,8 +46,11 @@
 #define RSHIFTO     0xB6
 #define LSHIFTO     0xAA
 #define CTRLO       0x9D
-#define ALTO        0xB9
+#define ALTO        0xB8
 #define TAB         0x0F
+#define ALT_F1      0x3B
+#define ALT_F2      0x3C
+#define ALT_F3      0x3D
 //external
 extern void keyboard_init();
 extern void update_term(unsigned int term);

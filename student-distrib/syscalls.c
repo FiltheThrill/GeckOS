@@ -107,7 +107,7 @@ void PCB_start()
      PCB_arr[c_process_num]->process_on = 0;
    }
 
-   //if not the  root reset everything and reset the current process number
+   //if not the root reset everything and reset the current process number
    if(root_check == 0)
    {
       PCB_arr[c_process_num]->argsize = 0;
@@ -143,7 +143,6 @@ void PCB_start()
      temp = 256;
      exception_flag = 0;
    }
-
    // update return value stack pointer and base pointer for jump to execute
   asm volatile(
        "movl %0, %%eax\n"
@@ -163,7 +162,7 @@ void PCB_start()
        :"b"(ebp_ret)
      );
 
-  //leave and return "from"" execute
+  //leave and return "from" execute
   asm volatile(
      "leave\n"
      "ret"
@@ -187,6 +186,7 @@ void PCB_start()
  */
 int32_t execute(const uint8_t* command)
 {
+  int32_t processcnt = 0;
   int32_t process_num;
   uint8_t first_word[WORD_SIZE];    //128?
   uint8_t rest_of_word[WORD_SIZE];
@@ -212,8 +212,10 @@ int32_t execute(const uint8_t* command)
       process_num = i;
       c_process_num = i;
       check = SUCCESS;
+      processcnt++;
       break;
     }
+    processcnt++;
   }
 
   if(check == FAILURE)   //a max amount of 6 processes can be running at any time

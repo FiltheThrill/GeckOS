@@ -22,16 +22,17 @@
 /* Number of vectors in the interrupt descriptor table (IDT) */
 #define NUM_VEC     256
 //paging stuff
-#define NOT_PRESENT			  0x00000002
-#define PRESENT				    0x00000003
+#define NOT_PRESENT			  0x2
+#define PRESENT				    0x3
 #define PAGING_EN 			  0x80000001
-#define PSE_EN				    0x00000090
-#define NUM_ENTRIES			  1024
+#define PSE_EN				    0x90
+#define NUM_ENTRIES			  0x400
 #define KERNEL_PAGE_INIT  0x00000183
 #define VIDMEM_PAGE_INIT  0x00000103
 #define KERNEL_ADDR			  0x400000
 #define VIDMEM_ADDR 		  0xB8000
-#define FOUR_KB				    4096
+#define VIDMEM_SPACE      0x6400000
+#define FOUR_KB				    0x1000
 
 #ifndef ASM
 
