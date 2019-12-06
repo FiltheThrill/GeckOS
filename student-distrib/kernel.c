@@ -15,6 +15,7 @@
 #include "paging.h"
 #include "files.h"
 #include "syscalls.h"
+#include "mouse.h"
 
 #define RUN_TESTS 1
 
@@ -155,6 +156,8 @@ void entry(unsigned long magic, unsigned long addr) {
 
     /* Init the keyboard */
     keyboard_init();
+
+    mouse_init();
 
 	   /* Init the RTC */
 	   rtc_init();
