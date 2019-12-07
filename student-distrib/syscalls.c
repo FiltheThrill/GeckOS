@@ -483,7 +483,9 @@ int32_t open(const uint8_t* filename)
 
   if(((uint32_t)filename > USER_END) || ((uint32_t)filename < USER_START))
   {
-    return FAILURE;
+    if(auto_pass == 'n'){
+      return FAILURE;
+    }
   }
 
   //find file by read_dentry_by_name
