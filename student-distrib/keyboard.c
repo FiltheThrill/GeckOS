@@ -11,6 +11,7 @@ https://wiki.osdev.org/Text_Mode_Cursor
 #include "types.h"
 #include "terminal.h"
 #include "syscalls.h"
+#include "pit.h"
 //globals
 //static vars
 //lowercase translational table with numbers
@@ -127,13 +128,15 @@ int32_t term_write(int32_t fd, const void * buf, int32_t nbytes){
   int bytecnt, flag;
   unsigned int t,i;
   char put;
+  cli();
+  disable_irq(PITIRQ);
   //get terminal based on process
   t = fetch_process();
   //shorten to string size
   if(nbytes > strlen(buf)){
     nbytes = strlen(buf);
   }
-  cli();
+
   bytecnt = 0;
   flag = 0;
   cmd_flag[t] = 'y';
@@ -180,6 +183,7 @@ int32_t term_write(int32_t fd, const void * buf, int32_t nbytes){
     }
     sti();
   }
+  enable_irq(PITIRQ);
   return bytecnt;
 }
 

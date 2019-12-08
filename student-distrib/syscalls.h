@@ -36,10 +36,9 @@
 #define SIG_CNT    5
 #define FULL      0
 
-//
 //https://barrgroup.com/Embedded-Systems/How-To/C-Function-Pointers
 typedef struct { //disgusting
-  int32_t (*read)(int32_t, void*, int32_t); //int32_t fd, uint8_t * buf, int32_t nbytes
+  int32_t (*read)(int32_t, void*, int32_t);
   int32_t (*write)(int32_t, const void*, int32_t);
   int32_t (*open)(const uint8_t*);
   int32_t (*close)(int32_t);
@@ -55,15 +54,19 @@ typedef struct {
 typedef struct PCB_t{
   file_descriptor_t file_array[MAXFILES];
   //was planning to maybe just put them in a pcb array ?
-  //int32_t process; //number to identify which process this pcb is
   struct PCB_t* parent_process; // number to identify parent process(this ould be a pointer as well if you ant to change it)
-  int32_t process_on;
-  uint32_t prev_esp0;
-  uint16_t prev_ss0;
-  uint32_t esp;
-  uint32_t ebp;
-  int32_t index;
-  int32_t p_index;
+  int32_t process_on;  //flag for in use
+  uint32_t prev_esp0; //for context switch
+  uint16_t prev_ss0;  //"                "
+  uint32_t esp0_scheduling;
+  uint32_t esp_scheduling;
+  uint32_t ebp_scheduling;
+  uint32_t esp;       //for return to execute
+  uint32_t ebp;       //"                   "
+  int32_t index;      //corresponding index in array
+  int32_t p_index;    //corresponding index of parent in array
+  int32_t r_index;    //terminal "root"
+  int has_child;
   //ADD STUFF AS YOU SEE FIT I DONT REALLY KNOW WHAT ELSE IS SUPPOSED GO IN HERE
   uint8_t args[MAXARGS];
   int32_t argsize;
@@ -71,12 +74,13 @@ typedef struct PCB_t{
   void* sig_arr[SIG_CNT];
 } PCB_t;
 
-PCB_t* PCB_arr[MAXPROCESSES];
+PCB_t* PCB_arr[MAXPROCESSES];  //array to hold all PCB's
 
-int32_t p_process_num;
-int32_t c_process_num;
+int32_t p_process_num;  //parent process number
+int32_t c_process_num;  //curent process number
 
 extern void PCB_start();
+
 extern int32_t halt(int8_t status);
 
 extern int32_t execute(const uint8_t* command);

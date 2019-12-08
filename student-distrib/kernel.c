@@ -15,6 +15,7 @@
 #include "paging.h"
 #include "files.h"
 #include "syscalls.h"
+#include "pit.h"
 
 #define RUN_TESTS 1
 
@@ -159,6 +160,8 @@ void entry(unsigned long magic, unsigned long addr) {
     term_init();
     /* Init the keyboard */
     keyboard_init();
+    /* Init the timer chip */
+    pit_init();
     /* Initialize devices, memory, filesystem, enable device interrupts on the
      * PIC, any other initialization stuff... */
      //term_putc('a');
@@ -176,10 +179,7 @@ void entry(unsigned long magic, unsigned long addr) {
     launch_tests();
 #endif
     /* Execute the first program ("shell") - via terminal now */
-    launch_term();
-    while(1==1){
-      //yeet
-    }
+    //launch_term();
     /* Spin (nicely, so we don't chew up cycles) */
     asm volatile (".1: hlt; jmp .1;");
 }

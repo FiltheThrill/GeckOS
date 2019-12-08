@@ -121,7 +121,7 @@ int32_t rtc_write(int32_t fd, const void* buf, int32_t nbytes)
 {
 	// use the value of nbytes to determine the frequency of our rtc
 	// if nbytes is not between 0 and 1024 or divisible by 2 return -1 for failure
-	switch(nbytes)
+	switch(*((uint32_t *) buf))
 	{
 		case 0:
 			rtc_curr_freq = 2;

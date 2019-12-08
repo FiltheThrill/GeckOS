@@ -11,6 +11,7 @@ Author - who even cares anymore*/
 #include "x86_desc.h"
 #include "rtc.h"
 #include "IDT.h"
+#include "pit.h"
 
 
 operations_table_t stdin;
@@ -83,49 +84,57 @@ void PCB_start()
  {
    uint32_t esp_ret, ebp_ret;
    int i, root_check = 0;
-   PCB_t* parent = PCB_arr[c_process_num]->parent_process;
-   esp_ret = PCB_arr[c_process_num]->esp;
-   ebp_ret = PCB_arr[c_process_num]->ebp;
-   tss.esp0 = PCB_arr[c_process_num]->prev_esp0;
+   int curr_idx = terminals[curterm_nodisp].process_idx;
+   for(i = 0; i < 4; i++)
+   {
+     if(curr_idx == terminals[curterm_nodisp].on_process[i])
+     {
+       terminals[curterm_nodisp].on_process[i]= -1;
+     }
+   }
+   PCB_t* parent = PCB_arr[terminals[curterm_nodisp].process_idx]->parent_process;
+   esp_ret = PCB_arr[terminals[curterm_nodisp].process_idx]->esp;
+   ebp_ret = PCB_arr[terminals[curterm_nodisp].process_idx]->ebp;
+   tss.esp0 = PCB_arr[terminals[curterm_nodisp].process_idx]->prev_esp0;
 
    for(i = 0; i < MAXFILES; i++)
    {
-     PCB_arr[c_process_num]->file_array[i].f_op_tbl_ptr = 0;
-     PCB_arr[c_process_num]->file_array[i].inode = -1;
-     PCB_arr[c_process_num]->file_array[i].f_pos = 0;
-     PCB_arr[c_process_num]->file_array[i].flags = 0;
+     PCB_arr[terminals[curterm_nodisp].process_idx]->file_array[i].f_op_tbl_ptr = 0;
+     PCB_arr[terminals[curterm_nodisp].process_idx]->file_array[i].inode = -1;
+     PCB_arr[terminals[curterm_nodisp].process_idx]->file_array[i].f_pos = 0;
+     PCB_arr[terminals[curterm_nodisp].process_idx]->file_array[i].flags = 0;
    }
    for(i = 0; i<MAXARGS; i++){
-     PCB_arr[c_process_num]->args[i] = 0;
+     PCB_arr[terminals[curterm_nodisp].process_idx]->args[i] = 0;
    }
    //change back any of the editied handlers
    for(i = 0; i<SIG_CNT; i++){
-     PCB_arr[c_process_num]->sig_arr[i] = sig_map[i];
+     PCB_arr[terminals[curterm_nodisp].process_idx]->sig_arr[i] = sig_map[i];
    }
-   if(c_process_num == 0)
+   if(terminals[curterm_nodisp].process_idx == 0)
    {
      root_check = 1;
-     PCB_arr[c_process_num]->process_on = 0;
+     PCB_arr[terminals[curterm_nodisp].process_idx]->process_on = 0;
    }
 
    //if not the root reset everything and reset the current process number
    if(root_check == 0)
    {
-      PCB_arr[c_process_num]->argsize = 0;
-      PCB_arr[c_process_num]->process_on = 0;
-      PCB_arr[c_process_num]->ebp = 0;
-      PCB_arr[c_process_num]->esp = 0;
-      PCB_arr[c_process_num]->prev_ss0 = 0;
-      PCB_arr[c_process_num]->prev_esp0 = 0;
-      PCB_arr[c_process_num]->index = -1;
-      PCB_arr[c_process_num]->p_index = -1;
-      PCB_arr[c_process_num]->parent_process = 0;
+      PCB_arr[terminals[curterm_nodisp].process_idx]->argsize = 0;
+      PCB_arr[terminals[curterm_nodisp].process_idx]->process_on = 0;
+      PCB_arr[terminals[curterm_nodisp].process_idx]->ebp = 0;
+      PCB_arr[terminals[curterm_nodisp].process_idx]->esp = 0;
+      PCB_arr[terminals[curterm_nodisp].process_idx]->prev_ss0 = 0;
+      PCB_arr[terminals[curterm_nodisp].process_idx]->prev_esp0 = 0;
+      PCB_arr[terminals[curterm_nodisp].process_idx]->index = -1;
+      PCB_arr[terminals[curterm_nodisp].process_idx]->p_index = -1;
+      PCB_arr[terminals[curterm_nodisp].process_idx]->parent_process = 0;
     }
-    c_process_num = parent->index;
-    p_process_num = parent->p_index;
+    terminals[curterm_nodisp].process_idx = parent->index;
+    terminals[curterm_nodisp].parent_process = parent->p_index;
 
    //update page directory entry
-   page_directory[PAGE128] = ((EIGHTMB + (c_process_num * FOURMB)) | SURP);
+   page_directory[PAGE128] = ((EIGHTMB + (terminals[curterm_nodisp].process_idx * FOURMB)) | SURP);
 
 
    //flush tlb
@@ -144,27 +153,40 @@ void PCB_start()
      temp = 256;
      exception_flag = 0;
    }
+
+
+   if(curr_idx < 3)
+   {
+     asm volatile(
+       "movl %0, %%esp\n"
+       "addl $8, %%esp\n"
+       :
+       :"r"(ebp_ret)
+     );
+     execute((const uint8_t*) "shell");
+
+   }
    // update return value stack pointer and base pointer for jump to execute
-  asm volatile(
+   asm volatile(
        "movl %0, %%eax\n"
        :
        :"r"(temp)
      );
 
-  asm volatile(
+   asm volatile(
        "movl %%ebx, %%esp\n"
        :
        :"b"(esp_ret)
      );
 
-  asm volatile(
+   asm volatile(
        "mov %%ebx, %%ebp\n"
        :
        :"b"(ebp_ret)
      );
 
-  //leave and return "from" execute
-  asm volatile(
+   //leave and return "from" execute
+   asm volatile(
      "leave\n"
      "ret"
      :
@@ -206,7 +228,6 @@ int32_t execute(const uint8_t* command)
   shellcall = shellflag;
   shellflag = 0;
   check = FAILURE;
-
   for(i = 0; i < MAXPROCESSES; i++)
   {
     if(PCB_arr[i]->process_on == 0)
@@ -214,13 +235,13 @@ int32_t execute(const uint8_t* command)
       PCB_arr[i]->process_on = 1;
       PCB_arr[i]->index = i;
       process_num = i;
-      c_process_num = i;
       check = SUCCESS;
       processcnt++;
       break;
     }
     processcnt++;
   }
+
 
   pcnt = processcnt;
   if(check == FAILURE)   //a max amount of 6 processes can be running at any time
@@ -230,7 +251,7 @@ int32_t execute(const uint8_t* command)
     return FULL;
   }
 
-  if(c_process_num != 0 && shellcall == 0)
+  if(process_num > 2)
   {
     if(((uint32_t)command > USER_END) || ((uint32_t)command < USER_START))
     {
@@ -376,24 +397,38 @@ for(i = MINFD; i < MAXFILES; i++)
   PCB_arr[process_num]->file_array[i].flags = 0;
 }
 
-//init default signals
-for(i = 0; i<SIG_CNT; i++){
-  PCB_arr[c_process_num]->sig_arr[i] = sig_map[i];
-}
 
 // if this is is our first process make its own parent,
 // otherwise use the last process as parent
-if(process_num == 0 || shellcall == 1)
+if(process_num < 3)
 {
   PCB_arr[process_num]->parent_process = PCB_arr[process_num];
-  p_process_num = process_num;
-  PCB_arr[process_num]->p_index = p_process_num;
+  PCB_arr[process_num]->p_index = process_num;
+  terminals[process_num].process_idx = process_num;
+  terminals[process_num].parent_process = process_num;
+  for(i = 0; i < 4; i++)
+  {
+    if(terminals[process_num].on_process[i] == -1)
+    {
+      terminals[process_num].on_process[i] = process_num;
+      break;
+    }
+  }
 }
 else
 {
-  PCB_arr[process_num]->parent_process = PCB_arr[p_process_num];
-  PCB_arr[process_num]->p_index = p_process_num;
-  p_process_num = process_num;
+  terminals[curterm].parent_process = terminals[curterm].process_idx;
+  terminals[curterm].process_idx = process_num;
+  PCB_arr[process_num]->parent_process = PCB_arr[terminals[curterm].parent_process];
+  PCB_arr[process_num]->p_index = terminals[curterm].parent_process;
+  for(i = 0; i < 4; i++)
+  {
+    if(terminals[curterm].on_process[i] == -1)
+    {
+      terminals[curterm].on_process[i] = process_num;
+      break;
+    }
+  }
 }
 
 /*+++++++++++++++++++++++++++++ PART 6: Context Switch +++++++++++++++++++++++++++++++++++++++++++++++*/
@@ -447,12 +482,12 @@ else
  */
 int32_t read(int32_t fd, void* buf, int32_t nbytes)
 {
-  if((fd == STDOUTFD) || (fd > MAXFD) || (fd < 0) || (PCB_arr[c_process_num]->file_array[fd].flags == 0))
+  if((fd == STDOUTFD) || (fd > MAXFD) || (fd < 0) || (PCB_arr[terminals[curterm_nodisp].process_idx]->file_array[fd].flags == 0))
   {
    return FAILURE;
   }
 
-  return PCB_arr[c_process_num]->file_array[fd].f_op_tbl_ptr->read(fd, buf, nbytes);
+  return PCB_arr[terminals[curterm_nodisp].process_idx]->file_array[fd].f_op_tbl_ptr->read(fd, buf, nbytes);
 }
 
 /*
@@ -467,11 +502,11 @@ int32_t read(int32_t fd, void* buf, int32_t nbytes)
  */
 int32_t write(int32_t fd, const void* buf, int32_t nbytes)
 {
-  if((fd <= STDINFD) || (fd > MAXFD) || (PCB_arr[c_process_num]->file_array[fd].flags == 0))
+  if((fd <= STDINFD) || (fd > MAXFD) || (PCB_arr[terminals[curterm_nodisp].process_idx]->file_array[fd].flags == 0))
   {
     return FAILURE;
   }
-  return PCB_arr[c_process_num]->file_array[fd].f_op_tbl_ptr->write(fd, buf, nbytes);
+  return PCB_arr[terminals[curterm_nodisp].process_idx]->file_array[fd].f_op_tbl_ptr->write(fd, buf, nbytes);
 }
 
 /*
@@ -508,11 +543,11 @@ int32_t open(const uint8_t* filename)
   //find an open file array index that is not in use
  for(i = MINFD; i < MAXFILES; i++)
  {
-   if(PCB_arr[c_process_num]->file_array[i].flags == 0)
+   if(PCB_arr[terminals[curterm_nodisp].process_idx]->file_array[i].flags == 0)
     {
       idx = i;
       check = SUCCESS;
-      PCB_arr[c_process_num]->file_array[i].flags = 1;
+      PCB_arr[terminals[curterm_nodisp].process_idx]->file_array[i].flags = 1;
       break;
     }
  }
@@ -528,30 +563,30 @@ switch(type)
     case RTC:
 
       //assign table
-      PCB_arr[c_process_num]->file_array[idx].f_op_tbl_ptr = &rtc_table;
+      PCB_arr[terminals[curterm_nodisp].process_idx]->file_array[idx].f_op_tbl_ptr = &rtc_table;
 
       //use rtc open
-       check = PCB_arr[c_process_num]->file_array[idx].f_op_tbl_ptr->open(filename);
+       check = PCB_arr[terminals[curterm_nodisp].process_idx]->file_array[idx].f_op_tbl_ptr->open(filename);
        return idx;
     case DIRECTORY:
 
       //assign table
-      PCB_arr[c_process_num]->file_array[idx].f_op_tbl_ptr = &directory_table;
+      PCB_arr[terminals[curterm_nodisp].process_idx]->file_array[idx].f_op_tbl_ptr = &directory_table;
 
       //use directory open
-      check = PCB_arr[c_process_num]->file_array[idx].f_op_tbl_ptr->open(filename);
+      check = PCB_arr[terminals[curterm_nodisp].process_idx]->file_array[idx].f_op_tbl_ptr->open(filename);
       return idx;
 
     case FILE:
 
       //assign tables
-      PCB_arr[c_process_num]->file_array[idx].f_op_tbl_ptr = &file_table;
+      PCB_arr[terminals[curterm_nodisp].process_idx]->file_array[idx].f_op_tbl_ptr = &file_table;
 
       //load in inode #
-      PCB_arr[c_process_num]->file_array[idx].inode = open_dentry.inode_num;
-      PCB_arr[c_process_num]->file_array[idx].f_pos = 0;
+      PCB_arr[terminals[curterm_nodisp].process_idx]->file_array[idx].inode = open_dentry.inode_num;
+      PCB_arr[terminals[curterm_nodisp].process_idx]->file_array[idx].f_pos = 0;
       //use file open
-      check = PCB_arr[c_process_num]->file_array[idx].f_op_tbl_ptr->open(filename);
+      check = PCB_arr[terminals[curterm_nodisp].process_idx]->file_array[idx].f_op_tbl_ptr->open(filename);
       return idx;
     default:
 
@@ -572,13 +607,13 @@ switch(type)
 int32_t close(int32_t fd)
 {
 
-  if((fd < MINFD) || (fd > MAXFD) || (PCB_arr[c_process_num]->file_array[fd].flags == 0))
+  if((fd < MINFD) || (fd > MAXFD) || (PCB_arr[terminals[curterm_nodisp].process_idx]->file_array[fd].flags == 0))
   {
     return -1;
   }
 
-  PCB_arr[c_process_num]->file_array[fd].flags = 0;
-  return PCB_arr[c_process_num]->file_array[fd].f_op_tbl_ptr->close(fd);
+  PCB_arr[terminals[curterm_nodisp].process_idx]->file_array[fd].flags = 0;
+  return PCB_arr[terminals[curterm_nodisp].process_idx]->file_array[fd].f_op_tbl_ptr->close(fd);
 }
 /*
  * getargs
@@ -598,11 +633,11 @@ int32_t getargs(uint8_t* buf, int32_t nbytes)
     return -1;
   }
 
-  len = PCB_arr[c_process_num]->argsize;
+  len = PCB_arr[terminals[curterm_nodisp].process_idx]->argsize;
 
   for(i = 0; i < len; i++)
   {
-    buf[i] = PCB_arr[c_process_num]->args[i];
+    buf[i] = PCB_arr[terminals[curterm_nodisp].process_idx]->args[i];
   }
 
   buf[len] = '\0';
@@ -656,10 +691,10 @@ int32_t set_handler(int32_t signum, void* handler_address)
     return -1;
   }
   if(handler_address == NULL){
-    PCB_arr[c_process_num]->sig_arr[signum] = sig_map[signum];
+    PCB_arr[terminals[curterm_nodisp].process_idx]->sig_arr[signum] = sig_map[signum];
   }
   else{
-    PCB_arr[c_process_num]->sig_arr[signum] = handler_address;
+    PCB_arr[terminals[curterm_nodisp].process_idx]->sig_arr[signum] = handler_address;
   }
   return 0;
 }

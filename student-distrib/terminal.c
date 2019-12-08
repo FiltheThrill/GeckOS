@@ -11,8 +11,8 @@ https://wiki.osdev.org/Page_Frame_Allocation
 #include "paging.h"
 #include "terminal.h"
 #include "syscalls.h"
+#include "pit.h"
 
-volatile unsigned int curterm;            //terminal being used (index)
 volatile uint32_t termmem[TNUM];          //vid mem pointers
 volatile int shellpid[TNUM];              //process id given to the coresponding shell
 volatile char termrun[TNUM];              //check if term is active
@@ -52,11 +52,21 @@ void term_init(){
     for(j=0; j<SCRSIZE; j++){
       *(uint8_t *)(termmem[i] + (j << 1)) = NULLCHAR;
       *(uint8_t *)(termmem[i] + (j << 1) + 1) = tattr[i];
-      return;
+    }
+  }
+
+  for(i = 0; i < 3; i++)
+  {
+    terminals[i].process_idx = -1;
+    terminals[i].parent_process = -1;
+    for(j = 0; j < 4; j++)
+    {
+      terminals[i].on_process[j] = -1;
     }
   }
   curterm = 0;
   shellflag = 0;
+
   return;
 }
 //launch term executes term after everything else is initialized
@@ -84,13 +94,13 @@ int term_start(int t){
   }
   //reset from first term
   if(t == -1){
-    launch_term();
+    //launch_term();
     return 1;
   }
   //running, switch back to it
   if(termrun[t] == 'y'){
     term_swap(t);
-    context_swap(t);
+    //context_swap(t);
     curterm = t;
     return 0;
   }
@@ -101,9 +111,9 @@ int term_start(int t){
     shellflag = 1;
     shellpid[t] = c_process_num;
     term_swap(t);
-    context_swap(t);
+  //  context_swap(t);
     curterm = t;
-    execute((const uint8_t*) "shell");
+    //execute((const uint8_t*) "shell");
     return 1;
   }
 }
@@ -230,20 +240,18 @@ void context_swap(int t){
 }
 //function to get the proper terminal process id in order to do sys calls
 unsigned int fetch_process(){
-  unsigned int id, pid;
-  int i;
-  PCB_t* node;
-  //find the parent (shell)
-  id = c_process_num;
-  for(i=0; i<MAXPROCESSES; i++){
-    node = PCB_arr[id];
-    pid = node->p_index;
-    if(id == pid){
-      return id;
+  int i,j;
+  int process = terminals[curterm_nodisp].process_idx;
+  for(i = 0; i < 3; i++)
+  {
+    for(j = 0; j < 4; j++)
+    if(process == terminals[i].on_process[j])
+    {
+      return i;
     }
-    id = pid;
   }
   //return curterm ( failed to find D: )
+  printf("error\n");
   return curterm;
 }
 //returns the requested term's usr mem adress

@@ -8,6 +8,7 @@
 #define SYS_CALL_VECT       0x80      // interrupt vector for system calls
 #define IRQ8                40        //real time clock
 #define KEYBOARD_IRQ        0x21      //keyboard interrupt vector
+#define TIMERCHIP                 0x20
 
 int exception_flag;
 

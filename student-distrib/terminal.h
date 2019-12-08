@@ -6,7 +6,13 @@
 
 //attr for term background color
 static uint8_t tattr[TNUM] = {7,6,5};
-
+volatile unsigned int curterm;            //terminal being used (index)
+typedef struct terminal_t{
+  int process_idx;
+  int parent_process;
+  int on_process[4];
+}terminal_t;
+terminal_t terminals[3];
 extern unsigned int fetch_process();
 extern void term_init();
 extern void term_swap(unsigned int t);

@@ -9,6 +9,8 @@ diagram in appendix A in mp3 documentation is hella clutch as well*/
 #include "lib.h"
 #include "x86_desc.h"
 #include "syscalls.h"
+#include "terminal.h"
+#include "pit.h"
 
 boot_block_t* boot_block;
 dentry_t global_dentry;
@@ -154,7 +156,6 @@ int32_t read_data(uint32_t inode, uint32_t offset, uint8_t* buf, uint32_t length
 
     for(offset_bytes = offset_bytes; offset_bytes < FOURKB; offset_bytes++)
     {
-
       //4kb * #blocks + offset bytes + starting address for data blocks
       buf_addr = (uint8_t*)(data_blocks + offset_bytes + data_idx * FOURKB);
       buf[i] = *buf_addr;
@@ -230,20 +231,13 @@ int32_t fwrite(int32_t fd, const void* buf, int32_t nbytes)
 int32_t fread(int32_t fd, void* buf, int32_t nbytes)
 {
   int32_t bytes_read;
-  uint32_t inode, offset, len;
+  uint32_t inode, offset;
 
-
-  inode = PCB_arr[c_process_num]->file_array[fd].inode;
-  offset = PCB_arr[c_process_num]->file_array[fd].f_pos;
-  len = inode_addr[inode].length_in_B;
-
-  if(offset >= len)
-  {
-    return 0;
-  }
+  inode = PCB_arr[terminals[curterm_nodisp].process_idx]->file_array[fd].inode;
+  offset = PCB_arr[terminals[curterm_nodisp].process_idx]->file_array[fd].f_pos;
 
   bytes_read = read_data(inode, offset, buf, nbytes);
-  PCB_arr[c_process_num]->file_array[fd].f_pos += bytes_read;
+  PCB_arr[terminals[curterm_nodisp].process_idx]->file_array[fd].f_pos += bytes_read;
 
   return bytes_read;
 }
