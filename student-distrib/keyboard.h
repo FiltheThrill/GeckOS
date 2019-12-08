@@ -76,5 +76,7 @@ void scroll_screen(unsigned int t);
 int history_fetch();
 void history_write();
 void auto_comp();
+//global
+char auto_pass;
 
 #endif

@@ -103,8 +103,7 @@ void keyboard_init(){
   //set term num to first term (0)
   term = 0;
   histidx = -1;
-  //clear vidmem
-  clear();
+  auto_pass = 'n';
   //enable req
   enable_irq(KEYIRQ);
   return;
@@ -126,7 +125,7 @@ void update_term(unsigned int t){
 */
 int32_t term_write(int32_t fd, const void * buf, int32_t nbytes){
   int bytecnt, flag;
-  unsigned int t,i;
+  unsigned int t;
   char put;
   cli();
   disable_irq(PITIRQ);
@@ -153,6 +152,7 @@ int32_t term_write(int32_t fd, const void * buf, int32_t nbytes){
       term_putc(t, put);
       bytecnt++;
       cursorX[t]++;
+      validate_cursor(t);
       if(*((uint8_t *) buf) == '>'){
         //found new cmd prompt, update start pos
         cmd_start[t] = bytecnt + cursorY[t]*XMAX;
@@ -161,27 +161,9 @@ int32_t term_write(int32_t fd, const void * buf, int32_t nbytes){
     }
     buf = ((uint8_t *) buf + 1);
   }
-  //prompt found, validate
   if(cmd_flag[t] == 'n'){
     cursorX[t]--;
     move_cursor(t);
-    //bad newln behind prompt, fix
-    if(cursorX[t] > CURSORD){
-      for(i=0; i<CURSORD; i++){
-        cursorX[t]--;
-        term_putc(t, NULLCHAR);
-      }
-      cursorY[t]++;
-      cursorX[t] = 0;
-      validate_cursor(t);
-      for(i=0; i<CURSOROFF; i++){
-        term_putc(t, prompt[i]);
-        cursorX[t]++;
-      }
-      move_cursor(t);
-      cmd_start[t] = cursorX[t] + cursorY[t]*XMAX;
-    }
-    sti();
   }
   enable_irq(PITIRQ);
   return bytecnt;
@@ -199,11 +181,30 @@ int32_t term_write(int32_t fd, const void * buf, int32_t nbytes){
 */
 int32_t term_read(int32_t fd, void * buf, int32_t nbytes){
   unsigned int t;
-  int32_t i,j;
+  int32_t i,j,x;
   char c;
-
-  //check for prev write with no prompt
+  //prompt found, validate
   t = fetch_process();
+  if(cmd_flag[t] == 'n'){
+    x = cursorX[t];
+    if(cursorX[t] != CURSORD){
+      for(i=0; i<CURSORD; i++){
+        cursorX[t]--;
+        term_putc(t, NULLCHAR);
+      }
+      //write on new ln
+      cursorY[t]++;
+      validate_cursor(t);
+      cursorX[t] = 0;
+      for(i=0; i<CURSOROFF; i++){
+        term_putc(t, prompt[i]);
+        cursorX[t]++;
+      }
+      move_cursor(t);
+      cmd_start[t] = cursorX[t] + cursorY[t]*XMAX;
+    }
+  }
+  //check for prev write with no prompt
   if(cmd_flag[t] == 'y'){
     cmd_start[t] = cursorX[t] + cursorY[t] * XMAX;
     move_cursor(t);
@@ -925,105 +926,75 @@ void history_write(){
 *   SIDE EFFECTS: changed the contents of the cmd_buf
 */
 void auto_comp(){
-  uint8_t buf[SBUF];
-  uint8_t argbuf[SBUF];
-  uint8_t sbuf[2048];
-  uint32_t sidx[200];
-  char hit[200];
-  int32_t cnt, fd, i, j, key;
-  int32_t tot, fcnt, charcnt;
-  char c;
+  uint8_t buf[SBUF+1];
+  uint8_t argbuf[BUFMAX];
+  uint8_t sbuf[200][BUFMAX];
+  uint32_t slen[200];
+  int32_t cnt, fd, i, j, key, hit;
+  int32_t fcnt, charcnt, aflag;
 
   i=0;
   cnt=0;
   //find most recent space for next arg
   while(i<BUFMAX && i<cmd_len[term]){
     if(cmd_buf[term][i] == ' '){
-      cnt = i;
+      cnt = i+1;
     }
     i++;
   }
-  if(cnt < 1 || cnt == cmd_len[term]-1){
-    return; //return if no useful
-  }
-  key = cnt+1;
+  key = cnt;
   //get rest of arg and count it
   charcnt = 0;
-  for(i=cnt;i<cmd_len[term];i++){
+  for(i=key;i<cmd_len[term];i++){
     argbuf[charcnt] = cmd_buf[term][i];
     charcnt++;
   }
-  //open dir
+  //open directory, allow kernel open
+  auto_pass = 'y';
   fd = open((uint8_t*)".");
   if(fd == -1){
     return;
   }
+  auto_pass = 'n';
   //get file count and load array
   cnt = 1;
-  tot = 0;
   fcnt = 0;
-  while (0 != (cnt = read(fd,buf,SBUF-1))){
-    sidx[fcnt] = tot;
+  while (0 != (cnt = read(fd,buf,SBUF))){
     for(i=0;i<cnt;i++){
-      sbuf[tot] = buf[i];
-      tot++;
+      sbuf[fcnt][i] = buf[i];
     }
+    slen[fcnt] = i;
     fcnt++;
   }
-  sidx[fcnt] = tot - sidx[fcnt-1];
   close(fd);
   //parse the chars
+  cnt = 0;
+  hit = -1;
   for(i=0;i<fcnt;i++){
-    hit[i] = 'y';
-  }
-  for(i=0;i<charcnt;i++){
-    c = argbuf[i];
-    for(j=0;j<fcnt;j++){
-      //out of chars
-      if(sidx[j]+i >= sidx[j+1]){
-        hit[j] = 'n';
+    aflag = 0;
+    for(j=0;j<BUFMAX;j++){
+      if(j == charcnt && aflag == 0){
+        cnt++;
+        hit = i;
       }
-      if(c != sbuf[sidx[j]+i]){
-        hit[j] = 'n';
-      }
-      tot = 0;
-      for(cnt=0;cnt<fcnt;cnt++){
-        if(hit[cnt] == 'y'){
-          tot++;
-        }
-      }
-      if(tot == 1){
-        break;
+      if(argbuf[j] != sbuf[i][j]){
+        aflag = 1;
       }
     }
-  }
-  //more than one match
-  tot = 0;
-  for(cnt=0;cnt<fcnt;cnt++){
-    if(hit[cnt] == 'y'){
-      tot++;
+    if(cnt > 1){
+      return; //too many matches
     }
   }
-  if(tot != 1){
+  //no hits
+  if(hit == -1){
     return;
   }
-  //found a match!!!
-  cursorX[term] = cursorX[term] - charcnt;
-  for(i=0;i<fcnt;i++){
-    if(hit[i] == 'y'){
-      tot = i;
-      break;
-    }
+  //found, update the cmd
+  for(i=0;i<BUFMAX-key;i++){
+    cmd_buf[term][i+key] = sbuf[hit][i];
   }
-  cnt = 0;
-  j = key;
-  for(i=sidx[tot];i<sidx[tot+1];i++){
-    cmd_buf[term][j] = sbuf[i];
-    j++;
-    cnt++;
-    cursorX[term]++;
-  }
-  cmd_len[term] = key+cnt;
+  cmd_len[term] = key+slen[hit];
+  cursorX[term] = cursorX[term]+ slen[hit] - charcnt;
   reprint_cmd(term);
   move_cursor(term);
   return;
