@@ -44,9 +44,11 @@ void pit_handler()
 
   cli();
 
+
   //if 3 shells arent running set up the other 2 shells
   if((shell_flag == 0))
   {
+    //starts at 0
     //set pcb to be base shell of the current serviced terminal
     curr_PCB = PCB_arr[terminals[curterm_nodisp].process_idx];
 
@@ -65,56 +67,22 @@ void pit_handler()
     //continue to next terminal
     curterm_nodisp = curterm_nodisp + 1;
     curterm_nodisp = curterm_nodisp % 3;
-    if(curterm_nodisp != 0)
+
+
+    //last 2 shells not launched yet; launch a shell
+    if(curterm_nodisp == 2)
     {
-      if(curterm_nodisp == 2)
-      {
-        //we've launched 3 shells ( about to :) )
-        shell_flag = 1;
-      }
-      //last 2 shells not launched yet; launch a shell
-      sti();
-      send_eoi(PITIRQ);
-      execute((const uint8_t*) "shell");
+      //we've launched 3 shells ( about to :) )
+      shell_flag = 1;
     }
-    else
-    {
-      //context switch to shell in terminal 0
-      curr_PCB = PCB_arr[0];
-      stack = curr_PCB->esp_scheduling;
-      base = curr_PCB->ebp_scheduling;
-
-      //set up page directory to map to physical memory and enable S, U , R, and P bits
-     page_directory[PAGE128] = ((EIGHTMB + (terminals[curterm_nodisp].process_idx * FOURMB)) | SURP);
-
-     //flush tlb
-     asm volatile(
-       "movl %%cr3, %%eax\n"
-       "movl %%eax, %%cr3\n"
-       :
-       :
-       :"eax"
-     );
-
-      tss.esp0 = curr_PCB->esp0_scheduling;
-
-      asm volatile(
-          "movl %%ebx, %%esp\n"
-          :
-          :"b"(stack)
-        );
-
-      asm volatile(
-          "mov %%ebx, %%ebp\n"
-          :
-          :"b"(base)
-        );
-      sti();
-      send_eoi(PITIRQ);
-    }
+    sti();
+    send_eoi(PITIRQ);
+    execute((const uint8_t*) "shell");
   }
+
   else        //intterupt after first 3 shells are set up
   {
+    //starts at 2
     //get current top process on the terminal we're servicing  and save its contents
     curr_PCB = PCB_arr[terminals[curterm_nodisp].process_idx];
     asm volatile(
@@ -165,7 +133,7 @@ void pit_handler()
     sti();
     send_eoi(PITIRQ);
   }
-  
+
   asm("leave");
   asm("iret");
 }
