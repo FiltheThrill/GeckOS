@@ -30,7 +30,7 @@ void pit_init()
 }
 /*
  * pit_handler
- *   DESCRIPTION: shecdules between 3 terminals at 41hz. Context switches
+ *   DESCRIPTION: shcedules between 3 terminals at 41hz. Context switches
                   the 3 terminal's top proces's each interrupt
  *   INPUTS: none
  *   OUTPUTS: none
@@ -43,7 +43,6 @@ void pit_handler()
   uint32_t base, stack;
 
   cli();
-
 
   //if 3 shells arent running set up the other 2 shells
   if((shell_flag == 0))
@@ -68,7 +67,6 @@ void pit_handler()
     curterm_nodisp = curterm_nodisp + 1;
     curterm_nodisp = curterm_nodisp % 3;
 
-
     //last 2 shells not launched yet; launch a shell
     if(curterm_nodisp == 2)
     {
@@ -79,7 +77,6 @@ void pit_handler()
     send_eoi(PITIRQ);
     execute((const uint8_t*) "shell");
   }
-
   else        //intterupt after first 3 shells are set up
   {
     //starts at 2

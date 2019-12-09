@@ -58,6 +58,8 @@ volatile char cmd_flag[TNUM];                    //flag to detect prompt writes
 volatile int histidx;                            //index in the history buf
 volatile char cmd_hist[HISTNUM][BUFMAX];         //allows for cmd history up to a cnt
 volatile int cmd_hist_len[HISTNUM];              //stores the saved cmd len
+//attr for term background color
+static uint8_t tattr[TNUM] = {7,6,9};
 /*
 * keyboard_init
 *   DESCRIPTION: enables irq1 to allow keyboard interrupts

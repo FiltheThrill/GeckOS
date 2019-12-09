@@ -137,6 +137,7 @@ void PCB_start()
     }
     terminals[curterm_nodisp].process_idx = parent->index;
     terminals[curterm_nodisp].parent_process = parent->p_index;
+    terminals[curterm_nodisp].fish = -1;
 
    //update page directory entry
    page_directory[PAGE128] = ((EIGHTMB + (terminals[curterm_nodisp].process_idx * FOURMB)) | SURP);
@@ -481,6 +482,7 @@ else
  */
 int32_t read(int32_t fd, void* buf, int32_t nbytes)
 {
+
   if((fd == STDOUTFD) || (fd > MAXFD) || (fd < 0) || (PCB_arr[terminals[curterm_nodisp].process_idx]->file_array[fd].flags == 0))
   {
    return FAILURE;
@@ -656,16 +658,20 @@ int32_t getargs(uint8_t* buf, int32_t nbytes)
  */
 int32_t vidmap(uint8_t** screen_start)
 {
-  int check;
+  int check, t;
   uint32_t Vaddr,Paddr;
   //check for invalid adresses
   if((uint32_t)screen_start < USER_START || (uint32_t)screen_start > USER_END)
   {
     return -1;
   }
-  //utilize static adresses
+  //pick adress based on termianl
   Vaddr = (uint32_t)VIDMEM_CPY;
   Paddr = (uint32_t)VIDMEM_ADDR;
+  t = fetch_process();
+  if(t != curterm){
+    Vaddr = term_addr(t);
+  }
   //remap the memory from virtual loc to physical vidmems
   check = page_to_phys(Vaddr,Paddr);
 
@@ -675,6 +681,7 @@ int32_t vidmap(uint8_t** screen_start)
   }
   //paging success! set new screen start and return
   *screen_start = (uint8_t*)VIDMEM_CPY;
+  terminals[curterm].fish = curterm;
   return VIDMEM_CPY;
 }
 /*

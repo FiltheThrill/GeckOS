@@ -18,7 +18,8 @@ volatile int shellpid[TNUM];              //process id given to the coresponding
 volatile char termrun[TNUM];              //check if term is active
 volatile uint32_t swapebp[TNUM];          //storage for each ebp
 volatile uint32_t swapesp[TNUM];          //storage for each esp
-
+//attr for term background color
+static uint8_t tattr[TNUM] = {7,6,9};
 /*
 * term_init
 *   DESCRIPTION: This function fills the terminal global vars with default values
@@ -59,6 +60,7 @@ void term_init(){
   {
     terminals[i].process_idx = -1;
     terminals[i].parent_process = -1;
+    terminals[i].fish = -1;
     for(j = 0; j < 4; j++)
     {
       terminals[i].on_process[j] = -1;
@@ -141,7 +143,7 @@ void term_stop(int t){
   swapebp[t] = 0;
   swapesp[t] = 0;
   //kill the given processes belonging to the shell
-  while(PCB_arr[c_process_num]->parent_process != c_process_num){
+  while(PCB_arr[c_process_num]->p_index != c_process_num){
     //halt(-2);
     break;
   }
