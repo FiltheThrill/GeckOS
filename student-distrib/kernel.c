@@ -16,6 +16,7 @@
 #include "files.h"
 #include "syscalls.h"
 #include "mouse.h"
+#include "speaker.h"
 
 #define RUN_TESTS 1
 
@@ -165,6 +166,8 @@ void entry(unsigned long magic, unsigned long addr) {
      files_init(boot);
 
      PCB_start();
+
+     beep();
     /* Initialize devices, memory, filesystem, enable device interrupts on the
      * PIC, any other initialization stuff... */
      //term_putc('a');
