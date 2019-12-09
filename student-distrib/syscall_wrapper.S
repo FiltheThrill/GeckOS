@@ -16,7 +16,6 @@ syscall_handler:
     pushl %edi
     pushl %esi
     pushl %edx
-    pushl %ebp  # is this one needed, who knows i dont care
     pushl %ecx
 
     # 'push the three args (first arg is ebx, second is ecx, thrid is edx)
@@ -33,7 +32,6 @@ syscall_handler:
 
     # 'pop em like pimples
     popl %ecx
-    popl %ebp
     popl %edx
     popl %esi
     popl %edi

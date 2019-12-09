@@ -65,8 +65,6 @@ typedef struct PCB_t{
   uint32_t ebp;       //"                   "
   int32_t index;      //corresponding index in array
   int32_t p_index;    //corresponding index of parent in array
-  int32_t r_index;    //terminal "root"
-  int has_child;
   //ADD STUFF AS YOU SEE FIT I DONT REALLY KNOW WHAT ELSE IS SUPPOSED GO IN HERE
   uint8_t args[MAXARGS];
   int32_t argsize;

@@ -160,7 +160,8 @@ void entry(unsigned long magic, unsigned long addr) {
     term_init();
     /* Init the keyboard */
     keyboard_init();
-    /* Init the timer chip */
+    /* Init the timer chip and launch first shell*/
+    execute((const uint8_t*) "shell");
     pit_init();
     /* Initialize devices, memory, filesystem, enable device interrupts on the
      * PIC, any other initialization stuff... */

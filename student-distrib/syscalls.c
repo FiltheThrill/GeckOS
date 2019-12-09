@@ -20,7 +20,6 @@ operations_table_t file_table;
 operations_table_t rtc_table;
 operations_table_t directory_table;
 static void* sig_map[] = {kill,kill,kill,ignore,ignore};
-volatile int pcnt;
 /*
  * PCB_start
  *   DESCRIPTION: initializes PCB array at bottom of the 4mb kernel stack, each
@@ -68,7 +67,6 @@ void PCB_start()
   file_table.write = &fwrite;
   file_table.open = &fopen;
   file_table.close = &fclose;
-
   return;
 }
 /*
@@ -85,6 +83,8 @@ void PCB_start()
    uint32_t esp_ret, ebp_ret;
    int i, root_check = 0;
    int curr_idx = terminals[curterm_nodisp].process_idx;
+
+   //reset the process array index for that terminal
    for(i = 0; i < 4; i++)
    {
      if(curr_idx == terminals[curterm_nodisp].on_process[i])
@@ -92,11 +92,13 @@ void PCB_start()
        terminals[curterm_nodisp].on_process[i]= -1;
      }
    }
+   //fetch parent process and its esp and ebp for context switch
    PCB_t* parent = PCB_arr[terminals[curterm_nodisp].process_idx]->parent_process;
    esp_ret = PCB_arr[terminals[curterm_nodisp].process_idx]->esp;
    ebp_ret = PCB_arr[terminals[curterm_nodisp].process_idx]->ebp;
    tss.esp0 = PCB_arr[terminals[curterm_nodisp].process_idx]->prev_esp0;
 
+   ///flush file array
    for(i = 0; i < MAXFILES; i++)
    {
      PCB_arr[terminals[curterm_nodisp].process_idx]->file_array[i].f_op_tbl_ptr = 0;
@@ -104,6 +106,7 @@ void PCB_start()
      PCB_arr[terminals[curterm_nodisp].process_idx]->file_array[i].f_pos = 0;
      PCB_arr[terminals[curterm_nodisp].process_idx]->file_array[i].flags = 0;
    }
+   //flush args
    for(i = 0; i<MAXARGS; i++){
      PCB_arr[terminals[curterm_nodisp].process_idx]->args[i] = 0;
    }
@@ -111,7 +114,9 @@ void PCB_start()
    for(i = 0; i<SIG_CNT; i++){
      PCB_arr[terminals[curterm_nodisp].process_idx]->sig_arr[i] = sig_map[i];
    }
-   if(terminals[curterm_nodisp].process_idx == 0)
+
+   //check if one of 3 base shells
+   if(curr_idx < 3)
    {
      root_check = 1;
      PCB_arr[terminals[curterm_nodisp].process_idx]->process_on = 0;
@@ -154,8 +159,8 @@ void PCB_start()
      exception_flag = 0;
    }
 
-
-   if(curr_idx < 3)
+   //if one of 3 base shells reset stack using its own ebp
+   if(root_check == 1)
    {
      asm volatile(
        "movl %0, %%esp\n"
@@ -164,9 +169,9 @@ void PCB_start()
        :"r"(ebp_ret)
      );
      execute((const uint8_t*) "shell");
-
    }
-   // update return value stack pointer and base pointer for jump to execute
+
+   // update return value stack pointer and base pointer for "jump" to execute
    asm volatile(
        "movl %0, %%eax\n"
        :
@@ -209,12 +214,9 @@ void PCB_start()
  */
 int32_t execute(const uint8_t* command)
 {
-  int32_t processcnt = 0;
-  int32_t process_num;
+  int32_t process_num, len;
   uint8_t first_word[WORD_SIZE];    //128?
   uint8_t rest_of_word[WORD_SIZE];
-  int32_t len;
-  int shellcall;
   int len_word1 = 0, i, j, check, word_flag = 0, error_flag = 0;
   dentry_t word1;
   uint32_t base, stack;
@@ -224,9 +226,7 @@ int32_t execute(const uint8_t* command)
   {
     return FAILURE;
   }
-  //check for a shell
-  shellcall = shellflag;
-  shellflag = 0;
+
   check = FAILURE;
   for(i = 0; i < MAXPROCESSES; i++)
   {
@@ -236,14 +236,11 @@ int32_t execute(const uint8_t* command)
       PCB_arr[i]->index = i;
       process_num = i;
       check = SUCCESS;
-      processcnt++;
       break;
     }
-    processcnt++;
   }
 
 
-  pcnt = processcnt;
   if(check == FAILURE)   //a max amount of 6 processes can be running at any time
   {
     uint8_t error_buf1[] = "Max Proccesses Reached!\nExit Out of Shell to Continue.";
@@ -308,14 +305,6 @@ int32_t execute(const uint8_t* command)
 
 /*+++++++++++++++++++++++++++++ PART 2: Executable check +++++++++++++++++++++++++++++++++++++++++++++++*/
 
-//store ebp and esp for eventual return to execute from halt
-asm volatile(
-  "movl %%esp, %0\n"
-  "movl %%ebp, %1\n"
-  :"=r"(stack), "=r"(base)
-);
-PCB_arr[process_num]->ebp = base;
-PCB_arr[process_num]->esp = stack;
 
   //check if file name exists
   check = read_dentry_by_name(first_word, &word1);
@@ -398,7 +387,7 @@ for(i = MINFD; i < MAXFILES; i++)
 }
 
 
-// if this is is our first process make its own parent,
+// if this is one of our 3 base shell processes make it its own parent,
 // otherwise use the last process as parent
 if(process_num < 3)
 {
@@ -406,6 +395,7 @@ if(process_num < 3)
   PCB_arr[process_num]->p_index = process_num;
   terminals[process_num].process_idx = process_num;
   terminals[process_num].parent_process = process_num;
+  //stuff for fetch process
   for(i = 0; i < 4; i++)
   {
     if(terminals[process_num].on_process[i] == -1)
@@ -421,6 +411,7 @@ else
   terminals[curterm].process_idx = process_num;
   PCB_arr[process_num]->parent_process = PCB_arr[terminals[curterm].parent_process];
   PCB_arr[process_num]->p_index = terminals[curterm].parent_process;
+  //stuff for fetch process
   for(i = 0; i < 4; i++)
   {
     if(terminals[curterm].on_process[i] == -1)
@@ -446,6 +437,14 @@ else
   eip_addr = eip_addr | (header[25] << 8);
   eip_addr = eip_addr | header[24];
 
+  //store ebp and esp for eventual return to execute from halt
+  asm volatile(
+    "movl %%esp, %0\n"
+    "movl %%ebp, %1\n"
+    :"=r"(stack), "=r"(base)
+  );
+  PCB_arr[process_num]->ebp = base;
+  PCB_arr[process_num]->esp = stack;
 
   if(error_flag == 1) //if error flag was tripped anywhere; halt
   {

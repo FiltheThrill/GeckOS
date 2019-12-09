@@ -103,6 +103,7 @@ void keyboard_init(){
   //set term num to first term (0)
   term = 0;
   histidx = -1;
+  clear();
   auto_pass = 'n';
   //enable req
   enable_irq(KEYIRQ);
